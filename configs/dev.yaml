@@ -1,0 +1,48 @@
+environment: dev
+
+data:
+  raw_data_path: "data/raw/transactions.csv"
+  processed_train_path: "data/processed/train.parquet"
+  processed_test_path: "data/processed/test.parquet"
+  features_path: "data/processed/features.json"
+  target_column: "is_fraud"
+  id_column: "transaction_id"
+  test_size: 0.2
+  random_state: 42
+
+features:
+  numerical_features:
+    - amount
+    - hour_of_day
+    - device_risk
+  categorical_features:
+    - merchant_category
+  derived_features:
+    - is_night_transaction
+    - high_amount_risk
+
+model:
+  name: "paysafe-fraud-detector"
+  alias: "champion"
+  algorithm: "HistGradientBoostingClassifier"
+  parameters:
+    max_iter: 100
+    learning_rate: 0.1
+    max_depth: 6
+    random_state: 42
+
+evaluation:
+  thresholds:
+    min_roc_auc: 0.70
+    min_pr_auc: 0.30
+    min_precision_at_recall_80: 0.20
+
+mlflow:
+  tracking_uri: "sqlite:///mlruns.db"
+  experiment_name: "paysafe-fraud-scoring-dev"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+  workers: 1

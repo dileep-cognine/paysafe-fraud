@@ -1,0 +1,63 @@
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.pytest_temp/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking & Linters
+.mypy_cache/
+.ruff_cache/
+
+# Environment Variables & Secrets (CRITICAL: NEVER IN GIT)
+.env
+*.env
+!.env.example
+
+# MLflow Tracking & Artifacts
+mlruns/
+mlruns.db
+mlruns_ci.db
+.trash/
+
+# DVC local storage & caches
+.dvc/cache
+.dvc/tmp
+/data/raw/*.csv
+/data/processed/*.parquet
+/data/processed/*.json
+/models/*
+!/data/raw/.gitkeep
+!/data/processed/.gitkeep
+!/data/README.md
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
