@@ -46,6 +46,7 @@ pythonpath = ["src"]
 addopts = "-v --strict-markers --basetemp=.pytest_temp -o asyncio_default_fixture_loop_scope=function"
 filterwarnings = [
     "ignore::DeprecationWarning",
+    "ignore::FutureWarning:pandera.*",
 ]
 
 [tool.ruff]

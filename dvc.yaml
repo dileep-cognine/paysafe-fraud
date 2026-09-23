@@ -1,0 +1,6 @@
+stages:
+  validate_data:
+    cmd: python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
+    deps:
+      - data/raw/transactions.csv
+      - src/fraud_scoring/data_validation.py
