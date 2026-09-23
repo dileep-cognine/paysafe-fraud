@@ -75,7 +75,10 @@ Data leakage is defended against at multiple layers:
    - Asserts `transaction_id` is not in `TRAIN_FEATURES`.
 2. **Schema Ingestion Gate**: `validate_raw_transactions(df, is_training=False)` rejects any serving payload containing `is_fraud`.
 3. **Forbidden Field Denylist**: Explicitly blocks post-authorization columns (e.g., `chargeback_amount`, `dispute_status`, `settlement_status`).
-4. **Guard Function**: `assert_no_leakage(columns)` is called before model matrix construction to block rogue features.
+4. **Target-Derived Field Guard**: Names such as `target_rolling_fraud_rate` and `is_fraud_encoded` are rejected; the label must never be transformed into a feature.
+5. **Guard Function**: `assert_no_leakage(columns)` is called before model matrix construction to block rogue features.
+
+The schema validates values as supplied. It never coerces strings to numbers or repairs malformed values: an input contract violation is reported and the validation command exits non-zero.
 
 ---
 
@@ -86,7 +89,8 @@ Data leakage is defended against at multiple layers:
 # Validate training dataset
 python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
 
-# Validate serving payload format
+# The raw sample is labelled training data. Supplying it with --mode serve is
+# expected to fail because the label is forbidden from serving payloads.
 python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode serve
 ```
 
