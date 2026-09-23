@@ -1,34 +1,36 @@
 """Unit tests for schema validation, data quality checks, and leakage guardrails."""
 
-import pytest
 import pandas as pd
+import pytest
+
 from fraud_scoring.data_validation import (
     IDENTITY_COLUMN,
+    SERVING_FEATURES,
     TARGET,
     TRAIN_FEATURES,
-    SERVING_FEATURES,
-    ALLOWED_MERCHANT_CATEGORIES,
-    DataValidationError,
     DataLeakageError,
-    validate_raw_transactions,
-    validate_and_enforce,
+    DataValidationError,
+    assert_contract_invariants,
     assert_no_leakage,
     check_leakage,
-    assert_contract_invariants,
+    validate_and_enforce,
+    validate_raw_transactions,
 )
 
 
 @pytest.fixture
 def valid_train_df() -> pd.DataFrame:
     """Fixture providing a known-valid training DataFrame."""
-    return pd.DataFrame({
-        "transaction_id": ["TXN_001", "TXN_002", "TXN_003"],
-        "amount": [10.50, 250.00, 45.20],
-        "merchant_category": ["grocery", "electronics", "fashion"],
-        "hour_of_day": [10, 23, 0],
-        "device_risk": [0.12, 0.85, 0.40],
-        "is_fraud": [0, 1, 0],
-    })
+    return pd.DataFrame(
+        {
+            "transaction_id": ["TXN_001", "TXN_002", "TXN_003"],
+            "amount": [10.50, 250.00, 45.20],
+            "merchant_category": ["grocery", "electronics", "fashion"],
+            "hour_of_day": [10, 23, 0],
+            "device_risk": [0.12, 0.85, 0.40],
+            "is_fraud": [0, 1, 0],
+        }
+    )
 
 
 @pytest.fixture
@@ -40,6 +42,7 @@ def valid_serve_df(valid_train_df: pd.DataFrame) -> pd.DataFrame:
 # =====================================================================
 # 1. Happy Path Tests
 # =====================================================================
+
 
 def test_valid_training_dataset_passes(valid_train_df):
     result = validate_raw_transactions(valid_train_df, is_training=True)
@@ -65,6 +68,7 @@ def test_validate_and_enforce_returns_df_when_valid(valid_train_df):
 # 2. Data Quality & Schema Failure Tests
 # =====================================================================
 
+
 def test_missing_values_fail(valid_train_df):
     df = valid_train_df.copy()
     df.loc[0, "amount"] = None
@@ -89,6 +93,18 @@ def test_invalid_amount_fails(valid_train_df):
     result_neg = validate_raw_transactions(df_neg, is_training=True)
     assert result_neg.is_valid is False
     assert any("amount" in err for err in result_neg.errors)
+
+
+def test_numeric_strings_are_not_silently_coerced(valid_train_df):
+    """The input contract must reject strings where a numeric value is required."""
+    df = valid_train_df.copy()
+    df["amount"] = df["amount"].astype(object)
+    df.loc[0, "amount"] = "10.50"
+
+    result = validate_raw_transactions(df, is_training=True)
+
+    assert result.is_valid is False
+    assert any("Pandera schema check failed" in err for err in result.errors)
 
 
 def test_invalid_hour_fails(valid_train_df):
@@ -150,7 +166,16 @@ def test_unexpected_columns_fail_strict_schema(valid_train_df):
 
 
 def test_empty_dataset_fails():
-    empty_df = pd.DataFrame(columns=["transaction_id", "amount", "merchant_category", "hour_of_day", "device_risk", "is_fraud"])
+    empty_df = pd.DataFrame(
+        columns=[
+            "transaction_id",
+            "amount",
+            "merchant_category",
+            "hour_of_day",
+            "device_risk",
+            "is_fraud",
+        ]
+    )
     result = validate_raw_transactions(empty_df, is_training=True)
     assert result.is_valid is False
     assert any("empty" in err for err in result.errors)
@@ -159,6 +184,7 @@ def test_empty_dataset_fails():
 # =====================================================================
 # 3. Leakage Protection & Invariant Tests
 # =====================================================================
+
 
 def test_serving_features_do_not_contain_target():
     """Verify that is_fraud is never present in SERVING_FEATURES."""
@@ -182,6 +208,12 @@ def test_target_leakage_detected_in_feature_columns():
 
     with pytest.raises(DataLeakageError, match="critical target leakage"):
         assert_no_leakage(bad_features, is_serving=False)
+
+
+def test_target_derived_feature_is_rejected():
+    """A feature calculated from the label must be treated as leakage."""
+    with pytest.raises(DataLeakageError, match="Target-derived columns detected"):
+        assert_no_leakage(["amount", "target_rolling_fraud_rate"])
 
 
 def test_target_leakage_in_serving_dataset_fails(valid_train_df):

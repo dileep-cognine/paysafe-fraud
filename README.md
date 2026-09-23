@@ -104,7 +104,7 @@ paysafe-fraud-scoring/
 ## 4. Getting Started
 
 ### 4.1 Prerequisites
-- Python 3.10+
+- Python 3.10, 3.11, 3.12, or 3.13
 - Git
 - Docker (optional, for container deployment)
 
@@ -123,19 +123,20 @@ source .venv/bin/activate
 
 Install the dependencies:
 ```bash
-# Production dependencies
-pip install -r requirements.txt
-
-# Development dependencies (testing, linting, DVC)
-pip install -r requirements-dev.txt
-
-# Editable install of package
-pip install -e .
+# Runtime package plus development tooling
+pip install -e ".[dev]"
 ```
 
 ### 4.3 Dependency Management Strategy
-- `pyproject.toml` defines abstract dependencies and project packaging standards conforming to PEP 517/518.
-- `requirements.txt` and `requirements-dev.txt` provide fixed minimum dependencies to ensure deterministic installs across local environments, CI runners, and Docker containers without external tool lock-in.
+- `pyproject.toml` is the source of truth for direct runtime and development dependencies.
+- `requirements.txt` and `requirements-dev.txt` are compatible direct-dependency lists for plain `pip` and container builds.
+- `requirements.lock` records the complete resolved environment used by CI and release builds. Refresh it only in a clean virtual environment after intentionally changing dependencies:
+
+  ```bash
+  pip install -e ".[dev]"
+  pip freeze --all | Out-File -Encoding ascii requirements.lock  # PowerShell
+  # pip freeze --all > requirements.lock                          # Linux/macOS
+  ```
 
 ---
 
@@ -157,6 +158,11 @@ $env:APP_ENV="dev"
 # Linux / macOS
 export APP_ENV="dev"
 ```
+
+The loader rejects missing configuration sections and unknown keys. Deployment values may override
+the YAML baseline through `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_NAME`, `MODEL_REGISTRY_NAME`,
+`MODEL_ALIAS`, `API_HOST`, `API_PORT`, `API_WORKERS`, and `LOG_LEVEL`. Keep credentials in the
+environment or your deployment secret store; never commit a `.env` file.
 
 ---
 

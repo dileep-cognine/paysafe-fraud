@@ -11,14 +11,19 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
+
 import numpy as np
 import pandas as pd
+
 try:
     import pandera.pandas as pa
 except ImportError:
     import pandera as pa
-from pandera import Check, Column, DataFrameSchema
 from pandera.errors import SchemaErrors
+
+Check = pa.Check
+Column = pa.Column
+DataFrameSchema = pa.DataFrameSchema
 
 # =====================================================================
 # 1. Feature Contracts & Column Definitions
@@ -84,10 +89,17 @@ FORBIDDEN_LEAKAGE_COLUMNS: Set[str] = {
     "post_auth_risk_score",
 }
 
+# Prefixes and suffixes reserved for columns derived from the label. They are
+# blocked even when a new target-derived column was not added to the explicit
+# denylist above.
+TARGET_DERIVED_PREFIXES: tuple[str, ...] = ("target_", "is_fraud_", "fraud_label_")
+TARGET_DERIVED_SUFFIXES: tuple[str, ...] = ("_target", "_is_fraud", "_fraud_label")
+
 
 # =====================================================================
 # 2. Custom Exceptions
 # =====================================================================
+
 
 class DataValidationError(Exception):
     """Raised when dataset fails schema, completeness, or range checks."""
@@ -108,6 +120,7 @@ class DataLeakageError(Exception):
 # =====================================================================
 # 3. Validation Result
 # =====================================================================
+
 
 @dataclass
 class ValidationResult:
@@ -131,6 +144,7 @@ class ValidationResult:
 # 4. Pandera Schemas
 # =====================================================================
 
+
 def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
     """Build Pandera schema for transaction data validation."""
     columns = {
@@ -148,13 +162,15 @@ def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
                 Check(lambda s: np.isfinite(s).all(), error="Amount must be finite"),
             ],
             nullable=False,
-            coerce=True,
             title="Transaction Amount",
         ),
         "merchant_category": Column(
             pa.String,
             checks=[
-                Check.isin(ALLOWED_MERCHANT_CATEGORIES, error=f"Merchant category must be in {ALLOWED_MERCHANT_CATEGORIES}"),
+                Check.isin(
+                    ALLOWED_MERCHANT_CATEGORIES,
+                    error=f"Merchant category must be in {ALLOWED_MERCHANT_CATEGORIES}",
+                ),
             ],
             nullable=False,
             title="Merchant Category",
@@ -165,7 +181,6 @@ def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
                 Check.in_range(0, 23, error="Hour of day must be an integer between 0 and 23"),
             ],
             nullable=False,
-            coerce=True,
             title="Hour of Transaction",
         ),
         "device_risk": Column(
@@ -175,7 +190,6 @@ def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
                 Check(lambda s: np.isfinite(s).all(), error="Device risk must be finite"),
             ],
             nullable=False,
-            coerce=True,
             title="Device Risk Score",
         ),
     }
@@ -187,7 +201,6 @@ def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
                 Check.isin([0, 1], error=f"Target {TARGET} must be either 0 or 1"),
             ],
             nullable=False,
-            coerce=True,
             title="Target Label (Training only)",
         )
 
@@ -201,6 +214,7 @@ def get_transaction_schema(is_training: bool = True) -> DataFrameSchema:
 # =====================================================================
 # 5. Leakage Guardrails
 # =====================================================================
+
 
 def check_leakage(feature_columns: Iterable[str], is_serving: bool = False) -> List[str]:
     """Inspect feature list and detect any target or post-auth leakage.
@@ -218,7 +232,9 @@ def check_leakage(feature_columns: Iterable[str], is_serving: bool = False) -> L
     # Check 1: Target label leakage
     if TARGET in col_set:
         context = "serving feature payload" if is_serving else "model feature matrix X"
-        violations.append(f"Target column '{TARGET}' detected in {context} (critical target leakage).")
+        violations.append(
+            f"Target column '{TARGET}' detected in {context} (critical target leakage)."
+        )
 
     # Check 2: Identity column leakage
     if IDENTITY_COLUMN in col_set:
@@ -233,6 +249,17 @@ def check_leakage(feature_columns: Iterable[str], is_serving: bool = False) -> L
             f"Post-authorization columns detected: {sorted(forbidden_present)}. Only pre-auth features allowed."
         )
 
+    # Check 4: Features directly derived from the training label.
+    target_derived = sorted(
+        column
+        for column in col_set
+        if column.startswith(TARGET_DERIVED_PREFIXES) or column.endswith(TARGET_DERIVED_SUFFIXES)
+    )
+    if target_derived:
+        violations.append(
+            f"Target-derived columns detected: {target_derived}. Labels may never be transformed into features."
+        )
+
     return violations
 
 
@@ -241,7 +268,8 @@ def assert_no_leakage(feature_columns: Iterable[str], is_serving: bool = False) 
     violations = check_leakage(feature_columns, is_serving=is_serving)
     if violations:
         raise DataLeakageError(
-            f"Data leakage check failed with {len(violations)} violation(s):\n" + "\n".join(f"  - {v}" for v in violations),
+            f"Data leakage check failed with {len(violations)} violation(s):\n"
+            + "\n".join(f"  - {v}" for v in violations),
             leaked_columns=violations,
         )
 
@@ -258,7 +286,9 @@ def assert_contract_invariants() -> None:
 
     # Invariant 3: IDENTITY_COLUMN must not be in TRAIN_FEATURES
     if IDENTITY_COLUMN in TRAIN_FEATURES:
-        raise DataLeakageError(f"CRITICAL: {IDENTITY_COLUMN} is present in TRAIN_FEATURES constant!")
+        raise DataLeakageError(
+            f"CRITICAL: {IDENTITY_COLUMN} is present in TRAIN_FEATURES constant!"
+        )
 
     # Invariant 4: SERVING_FEATURES must match TRAIN_FEATURES
     if sorted(SERVING_FEATURES) != sorted(TRAIN_FEATURES):
@@ -274,6 +304,7 @@ assert_contract_invariants()
 # =====================================================================
 # 6. Data Quality & Comprehensive Validation
 # =====================================================================
+
 
 def validate_raw_transactions(
     df: pd.DataFrame,
@@ -305,7 +336,9 @@ def validate_raw_transactions(
 
     unexpected_cols = actual_cols - expected_cols
     if unexpected_cols:
-        errors.append(f"Unexpected columns detected (strict schema violation): {sorted(unexpected_cols)}")
+        errors.append(
+            f"Unexpected columns detected (strict schema violation): {sorted(unexpected_cols)}"
+        )
 
     # 2. Check for leakage if serving
     if not is_training and TARGET in df.columns:
@@ -316,7 +349,9 @@ def validate_raw_transactions(
         dup_count = df[IDENTITY_COLUMN].duplicated().sum()
         if dup_count > 0:
             dup_examples = df[IDENTITY_COLUMN][df[IDENTITY_COLUMN].duplicated()].head(3).tolist()
-            errors.append(f"Found {dup_count} duplicate '{IDENTITY_COLUMN}' values (e.g., {dup_examples}).")
+            errors.append(
+                f"Found {dup_count} duplicate '{IDENTITY_COLUMN}' values (e.g., {dup_examples})."
+            )
 
     # 4. Missing value checks across expected columns
     for col in expected_cols.intersection(actual_cols):
@@ -340,19 +375,25 @@ def validate_raw_transactions(
     if "device_risk" in df.columns and pd.api.types.is_numeric_dtype(df["device_risk"]):
         invalid_risk = int(((df["device_risk"] < 0.0) | (df["device_risk"] > 1.0)).sum())
         if invalid_risk > 0:
-            errors.append(f"Column 'device_risk' contains {invalid_risk} values outside [0.0, 1.0].")
+            errors.append(
+                f"Column 'device_risk' contains {invalid_risk} values outside [0.0, 1.0]."
+            )
 
     # 8. Invalid merchant categories
     if "merchant_category" in df.columns:
         invalid_cats = set(df["merchant_category"].dropna().unique()) - ALLOWED_MERCHANT_CATEGORIES
         if invalid_cats:
-            errors.append(f"Column 'merchant_category' contains unauthorized categories: {sorted(invalid_cats)}")
+            errors.append(
+                f"Column 'merchant_category' contains unauthorized categories: {sorted(invalid_cats)}"
+            )
 
     # 9. Target validity (training only)
     if is_training and TARGET in df.columns and pd.api.types.is_numeric_dtype(df[TARGET]):
         invalid_targets = set(df[TARGET].dropna().unique()) - {0, 1}
         if invalid_targets:
-            errors.append(f"Column '{TARGET}' contains invalid target values: {sorted(invalid_targets)} (expected {{0, 1}}).")
+            errors.append(
+                f"Column '{TARGET}' contains invalid target values: {sorted(invalid_targets)} (expected {{0, 1}})."
+            )
 
     # 10. Pandera Schema validation
     try:
@@ -373,7 +414,9 @@ def validate_raw_transactions(
         "total_records": total_records,
         "is_training": is_training,
         "fraud_rate": float(df[TARGET].mean()) if is_training and TARGET in df.columns else None,
-        "amount_mean": float(df["amount"].mean()) if "amount" in df.columns and pd.api.types.is_numeric_dtype(df["amount"]) else None,
+        "amount_mean": float(df["amount"].mean())
+        if "amount" in df.columns and pd.api.types.is_numeric_dtype(df["amount"])
+        else None,
         "error_count": len(errors),
     }
 
@@ -398,10 +441,17 @@ def validate_and_enforce(df: pd.DataFrame, is_training: bool = True) -> pd.DataF
 # 7. CLI Entrypoint for DVC / CI Pipeline Stage
 # =====================================================================
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate transaction data quality, schema, and leakage")
-    parser.add_argument("--data-path", default="data/raw/transactions.csv", help="Path to CSV dataset")
-    parser.add_argument("--mode", choices=["train", "serve"], default="train", help="Validation mode")
+    parser = argparse.ArgumentParser(
+        description="Validate transaction data quality, schema, and leakage"
+    )
+    parser.add_argument(
+        "--data-path", default="data/raw/transactions.csv", help="Path to CSV dataset"
+    )
+    parser.add_argument(
+        "--mode", choices=["train", "serve"], default="train", help="Validation mode"
+    )
     args = parser.parse_args()
 
     data_file = Path(args.data_path)

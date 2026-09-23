@@ -1,3 +1,5 @@
+# Direct development dependencies. The complete environment is recorded in
+# requirements.lock after a clean install; see README.md for the update command.
 -r requirements.txt
 pytest>=7.4.0
 pytest-cov>=4.1.0

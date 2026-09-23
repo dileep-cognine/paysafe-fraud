@@ -1,8 +1,8 @@
-import os
-# pyrefly: ignore [missing-import]
-import pytest
 from pathlib import Path
-from fraud_scoring.config import load_config, resolve_config_path, AppConfig
+
+import pytest
+
+from fraud_scoring.config import AppConfig, load_config, resolve_config_path
 
 
 def test_load_dev_config():
@@ -47,6 +47,20 @@ def test_config_invalid_schema_fails_loudly():
             bad_config.unlink()
 
 
+def test_config_missing_required_section_fails_loudly():
+    temp_dir = Path(".pytest_temp")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    incomplete_config = temp_dir / "incomplete_config.yaml"
+    incomplete_config.write_text("environment: dev\n", encoding="utf-8")
+
+    try:
+        with pytest.raises(ValueError, match="Configuration schema validation failed"):
+            load_config(str(incomplete_config), force_reload=True)
+    finally:
+        if incomplete_config.exists():
+            incomplete_config.unlink()
+
+
 def test_env_var_override(monkeypatch):
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "sqlite:///test_override.db")
     monkeypatch.setenv("MODEL_ALIAS", "test_candidate")
@@ -54,3 +68,11 @@ def test_env_var_override(monkeypatch):
     config = load_config("configs/dev.yaml", force_reload=True)
     assert config.mlflow.tracking_uri == "sqlite:///test_override.db"
     assert config.model.alias == "test_candidate"
+
+
+def test_unknown_environment_fails_loudly(monkeypatch):
+    monkeypatch.delenv("CONFIG_PATH", raising=False)
+    monkeypatch.setenv("APP_ENV", "missing-environment")
+
+    with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+        resolve_config_path()

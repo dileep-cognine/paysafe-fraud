@@ -46,3 +46,4 @@ server:
   port: 8000
   reload: false
   workers: 1
+  log_level: "INFO"

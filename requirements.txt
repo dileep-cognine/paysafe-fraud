@@ -1,4 +1,5 @@
-# Production runtime dependencies
+# Direct runtime dependencies. Exact, transitive versions are captured in
+# requirements.lock after a clean install; see README.md for the update command.
 pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
