@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -86,7 +86,7 @@ class AppConfig(StrictConfigModel):
 _CONFIG_CACHE: Optional[AppConfig] = None
 
 
-ENVIRONMENT_OVERRIDES: ClassVar[Dict[str, tuple[str, str]]] = {
+ENVIRONMENT_OVERRIDES: Dict[str, tuple[str, str]] = {
     "MLFLOW_TRACKING_URI": ("mlflow", "tracking_uri"),
     "MLFLOW_EXPERIMENT_NAME": ("mlflow", "experiment_name"),
     "MODEL_REGISTRY_NAME": ("model", "name"),

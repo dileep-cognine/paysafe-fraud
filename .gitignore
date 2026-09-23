@@ -27,6 +27,7 @@ wheels/
 .pytest_temp/
 .coverage
 htmlcov/
+reports/
 .tox/
 .nox/
 

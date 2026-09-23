@@ -14,11 +14,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import numpy as np
 import pandas as pd
-
-try:
-    import pandera.pandas as pa
-except ImportError:
-    import pandera as pa
+import pandera.pandas as pa
 from pandera.errors import SchemaErrors
 
 Check = pa.Check

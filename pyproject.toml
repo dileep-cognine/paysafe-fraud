@@ -34,6 +34,8 @@ dev = [
     "httpx>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.5.0",
+    "pandas-stubs>=2.0.0",
+    "types-PyYAML>=6.0.12",
     "dvc>=3.0.0"
 ]
 
@@ -61,7 +63,7 @@ select = ["E", "F", "I"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 files = ["src"]
 warn_return_any = true
 warn_unused_configs = true
