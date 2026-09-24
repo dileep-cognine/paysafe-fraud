@@ -92,11 +92,16 @@ def main() -> None:
     args = parser.parse_args()
     config = load_config(args.config)
     data_path = args.data_path or Path(config.data.raw_data_path)
-    candidate = train_candidate(data_path, config)
-    output = Path(config.model.artifact_path)
-    save_candidate(candidate, output)
-    print(f"Saved candidate to {output} (dataset SHA-256: {candidate.dataset_sha256})")
-    print(f"Validation rows held out: {len(candidate.validation_indices)}")
+    # Keep MLflow orchestration outside the estimator implementation.
+    from fraud_scoring.mlflow_tracking import run_training_experiment
+
+    outcome = run_training_experiment(data_path, config)
+    print(f"Saved candidate to {config.model.artifact_path}")
+    print(f"Saved evaluation to {config.evaluation.metrics_path}")
+    print(f"MLflow run: {outcome.run_id} (model: {outcome.model_uri})")
+    print(f"Quality gate: {'PASS' if outcome.evaluation.passed else 'FAIL'}")
+    if not outcome.evaluation.passed:
+        raise SystemExit("Quality gate FAILED: " + "; ".join(outcome.evaluation.failed_thresholds))
 
 
 if __name__ == "__main__":

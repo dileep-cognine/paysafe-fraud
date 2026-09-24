@@ -94,6 +94,12 @@ def evaluate_candidate(
     )
 
 
+def save_evaluation(result: EvaluationResult, path: Path) -> None:
+    """Write the exact measured result for local inspection and tracking."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate a local fraud-scoring candidate")
     parser.add_argument("--config", help="YAML profile; defaults to APP_ENV / CONFIG_PATH")
@@ -108,8 +114,7 @@ def main() -> None:
         raise TypeError(f"Artifact at {model_path} is not a fraud-scoring candidate.")
     result = evaluate_candidate(candidate, data_path, config)
     output = Path(config.evaluation.metrics_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8")
+    save_evaluation(result, output)
     print(json.dumps(asdict(result), indent=2))
     print(f"Saved evaluation to {output}")
     if not result.passed:

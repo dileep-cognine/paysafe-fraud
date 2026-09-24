@@ -6,13 +6,13 @@
 [![DVC](https://img.shields.io/badge/data-DVC-945DD6.svg)](https://dvc.org/)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 
-Production-grade, end-to-end Machine Learning Operations (MLOps) system for real-time transaction fraud scoring. Designed with strict train/serve consistency, zero-leakage schema enforcement, automated quality gates, MLflow experiment tracking and model registry promotion, and secure containerized deployment.
+An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, and MLflow experiment tracking. Registry promotion, serving, and deployment are planned later stages.
 
 ---
 
 ## 1. System Architecture & Flow
 
-The system strictly adheres to the following production lifecycle:
+The planned lifecycle is shown below; this repository currently implements through MLflow tracking:
 
 ```text
 Raw Data (CSV)
@@ -53,7 +53,7 @@ To prevent training-serving skew and data leakage, data schemas are strictly gov
 | `device_risk` | float | Yes | Yes | Device risk confidence score (0.0–1.0) |
 | `is_fraud` | int/bool | **Yes** | **NO** | Target label. **Strictly forbidden at serve time (leakage)** |
 
-The **shared feature builder** (`src/fraud_scoring/features.py`) applies the fixed model-feature order and dtypes for both training and inference. It deliberately has no learned encoding yet; later preprocessing must be fitted once during training and reused at inference.
+The **shared feature builder** (`src/fraud_scoring/features.py`) applies the fixed model-feature order and dtypes for both training and inference. Learned encoding is fitted inside the training pipeline and saved with the classifier for later inference.
 
 ---
 
@@ -211,3 +211,41 @@ synthetic sample; they are not business acceptance criteria. Production has
 stricter configured thresholds and must be calibrated with real reviewed data.
 Passing this local gate makes a candidate eligible for a later approval process;
 it does not register, promote, or deploy a model.
+
+## 8. MLflow experiment tracking
+
+`python -m fraud_scoring.train --config configs/dev.yaml` now trains, evaluates,
+applies the existing quality gate, and records the complete candidate experiment
+in MLflow. The standalone evaluation command remains available to recheck a
+saved candidate. The run is recorded even when the gate fails; in that case the
+training command exits nonzero after logging. No model is registered or promoted.
+
+The tracking URI and experiment name come from the selected YAML profile or the
+`MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
+the current `.env.example`, local runs use `sqlite:///mlruns.db` and the
+`fraud-scoring-dev` experiment. If no override is set, `configs/dev.yaml` uses
+`paysafe-fraud-scoring-dev` instead. Start the local UI from the repository root:
+
+```bash
+python -m mlflow ui --backend-store-uri sqlite:///mlruns.db --host 127.0.0.1 --port 5000
+```
+
+Then open `http://127.0.0.1:5000`. If you override the tracking URI, pass that
+same URI to `--backend-store-uri` so the UI reads the same store.
+
+Each run records model type and hyperparameters, seed, split fraction, feature
+names, and preprocessing; the measured evaluation metrics and class/row counts;
+the actual dataset path, byte size, row count, and raw-file SHA-256; and the
+saved `metrics.json`. MLflow also records the input dataset metadata. The model
+artifact contains the fitted scaler, one-hot encoder, and classifier. Its
+signature and input example are inferred from a real validated synthetic row
+passed through the shared serving feature builder: `amount`,
+`merchant_category`, `hour_of_day`, and `device_risk`. The model output is the
+two class probabilities; the fraud risk score is the second probability.
+`transaction_id` and `is_fraud` are absent from the model input.
+
+The `quality_gate_status` run tag is `PASS` or `FAIL`; failed threshold details
+are tagged when applicable. A `git_commit` tag is added only when Git returns an
+actual commit hash. The SHA-256 tag fingerprints the raw bytes; it is not a
+fabricated DVC version. MLflow may display the candidate under its logged-model
+section; that alone does not create a registered production model or alias.
