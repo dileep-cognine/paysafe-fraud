@@ -14,12 +14,15 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import numpy as np
 import pandas as pd
-
-try:
-    import pandera.pandas as pa
-except ImportError:
-    import pandera as pa
+import pandera.pandas as pa
 from pandera.errors import SchemaErrors
+
+from fraud_scoring.features import (
+    IDENTITY_COLUMN,
+    SERVING_FEATURES,
+    TARGET_COLUMN,
+    TRAINING_FEATURES,
+)
 
 Check = pa.Check
 Column = pa.Column
@@ -29,24 +32,10 @@ DataFrameSchema = pa.DataFrameSchema
 # 1. Feature Contracts & Column Definitions
 # =====================================================================
 
-IDENTITY_COLUMN: str = "transaction_id"
-TARGET: str = "is_fraud"
-
-# Features consumed by model estimators (excluding ID and Target)
-TRAIN_FEATURES: List[str] = [
-    "amount",
-    "merchant_category",
-    "hour_of_day",
-    "device_risk",
-]
-
-# Features accepted at serving time for authorization-time scoring
-SERVING_FEATURES: List[str] = [
-    "amount",
-    "merchant_category",
-    "hour_of_day",
-    "device_risk",
-]
+TARGET: str = TARGET_COLUMN
+# Backwards-compatible names for the Stage 2 validation interface. The values
+# originate in features.py, which is the shared feature contract.
+TRAIN_FEATURES: tuple[str, ...] = TRAINING_FEATURES
 
 # Complete schema columns expected in raw CSV inputs
 RAW_TRAIN_COLUMNS: List[str] = [

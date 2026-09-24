@@ -53,7 +53,7 @@ To prevent training-serving skew and data leakage, data schemas are strictly gov
 | `device_risk` | float | Yes | Yes | Device risk confidence score (0.0–1.0) |
 | `is_fraud` | int/bool | **Yes** | **NO** | Target label. **Strictly forbidden at serve time (leakage)** |
 
-Derived features (e.g., `is_night_transaction`, `high_amount_risk`) are generated dynamically by the **shared feature builder** (`src/fraud_scoring/features.py`), ensuring identical transformations across training and inference.
+The **shared feature builder** (`src/fraud_scoring/features.py`) applies the fixed model-feature order and dtypes for both training and inference. It deliberately has no learned encoding yet; later preprocessing must be fitted once during training and reused at inference.
 
 ---
 

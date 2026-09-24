@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-
 
 ALLOWED_MERCHANT_CATEGORIES = [
     "grocery",
@@ -42,15 +42,37 @@ def generate_synthetic_transactions(
     rng = np.random.default_rng(seed=random_seed)
 
     # 1. Unique transaction IDs
-    txn_ids = [f"TXN_{i+1:06d}" for i in range(n_records)]
+    txn_ids = [f"TXN_{i + 1:06d}" for i in range(n_records)]
 
     # 2. Hours of day (0-23) with day-time peak
-    hour_probs = np.array([
-        0.01, 0.01, 0.01, 0.01, 0.01, 0.02,  # 00-05 Night
-        0.03, 0.04, 0.05, 0.06, 0.07, 0.07,  # 06-11 Morning
-        0.08, 0.08, 0.07, 0.07, 0.07, 0.08,  # 12-17 Afternoon
-        0.07, 0.06, 0.05, 0.04, 0.03, 0.02,  # 18-23 Evening
-    ])
+    hour_probs = np.array(
+        [
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.02,  # 00-05 Night
+            0.03,
+            0.04,
+            0.05,
+            0.06,
+            0.07,
+            0.07,  # 06-11 Morning
+            0.08,
+            0.08,
+            0.07,
+            0.07,
+            0.07,
+            0.08,  # 12-17 Afternoon
+            0.07,
+            0.06,
+            0.05,
+            0.04,
+            0.03,
+            0.02,  # 18-23 Evening
+        ]
+    )
     hour_probs = hour_probs / hour_probs.sum()
     hours = rng.choice(np.arange(24), size=n_records, p=hour_probs)
 
@@ -107,21 +129,27 @@ def generate_synthetic_transactions(
             if rng.random() > 0.4:
                 amounts[i] = np.round(amounts[i] * rng.uniform(1.5, 3.0), 2)
 
-    df = pd.DataFrame({
-        "transaction_id": txn_ids,
-        "amount": amounts,
-        "merchant_category": categories,
-        "hour_of_day": hours.astype(int),
-        "device_risk": device_risks,
-        "is_fraud": is_fraud.astype(int),
-    })
+    df = pd.DataFrame(
+        {
+            "transaction_id": txn_ids,
+            "amount": amounts,
+            "merchant_category": categories,
+            "hour_of_day": hours.astype(int),
+            "device_risk": device_risks,
+            "is_fraud": is_fraud.astype(int),
+        }
+    )
 
     return df
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate synthetic transaction dataset for PaySafe Fraud Scoring")
-    parser.add_argument("--output", default="data/raw/transactions.csv", help="Target CSV output path")
+    parser = argparse.ArgumentParser(
+        description="Generate synthetic transaction dataset for PaySafe Fraud Scoring"
+    )
+    parser.add_argument(
+        "--output", default="data/raw/transactions.csv", help="Target CSV output path"
+    )
     parser.add_argument("--records", type=int, default=5000, help="Number of records to generate")
     parser.add_argument("--fraud-ratio", type=float, default=0.04, help="Target fraud ratio")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -136,7 +164,9 @@ def main():
         random_seed=args.seed,
     )
     df.to_csv(out_path, index=False)
-    print(f"Generated {len(df)} transactions -> {out_path} (Fraud count: {df['is_fraud'].sum()}, Rate: {df['is_fraud'].mean():.2%})")
+    print(
+        f"Generated {len(df)} transactions -> {out_path} (Fraud count: {df['is_fraud'].sum()}, Rate: {df['is_fraud'].mean():.2%})"
+    )
 
 
 if __name__ == "__main__":

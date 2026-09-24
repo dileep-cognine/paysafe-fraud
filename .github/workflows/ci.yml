@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, type check, test, and validate data
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      APP_ENV: ci
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install project and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Generate deterministic synthetic training data
+        run: |
+          python -m fraud_scoring.generate_data --output data/raw/transactions.csv --records 5000 --fraud-ratio 0.04 --seed 42
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Type check
+        run: python -m mypy src
+
+      - name: Run tests and write JUnit report
+        run: |
+          mkdir -p reports
+          python -m pytest --junitxml=reports/junit.xml
+
+      - name: Run raw-data quality and leakage gate
+        run: python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: reports/junit.xml
+          if-no-files-found: warn
