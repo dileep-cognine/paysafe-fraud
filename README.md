@@ -182,3 +182,32 @@ Verify configuration loader:
 ```bash
 python -c "from fraud_scoring.config import load_config; cfg = load_config(); print(f'Loaded {cfg.environment} environment configuration successfully')"
 ```
+
+## 7. Local candidate training and evaluation
+
+Stage 4 uses a logistic-regression baseline because its probability scores and fitted
+preprocessing are easy to inspect. The shared feature builder first enforces the
+four ordered input columns. A scikit-learn pipeline then fits a numeric scaler,
+one-hot encodes the merchant category, and fits the classifier **on training rows
+only**. The complete fitted pipeline is saved with `joblib` for later inference;
+serving must reuse it rather than fitting another encoder.
+
+The raw CSV is validated before a stratified 80/20 split. The split and model
+random seeds are set in `configs/*.yaml`. Training records the dataset SHA-256
+and holdout row indices in the candidate artifact. Evaluation rejects a changed
+dataset or feature contract, then calculates precision, recall, F1, ROC-AUC,
+PR-AUC, precision at 80% recall, and validation class counts.
+
+```bash
+python -m fraud_scoring.train --config configs/dev.yaml
+python -m fraud_scoring.evaluate --config configs/dev.yaml
+```
+
+The candidate is written to `artifacts/model/candidate.joblib` and measured
+results to `artifacts/evaluation/metrics.json`. Both directories are ignored by
+Git. The evaluation command exits nonzero if any configured threshold is missed.
+The dev/CI thresholds are demonstration gates chosen from the measured 5,000-row
+synthetic sample; they are not business acceptance criteria. Production has
+stricter configured thresholds and must be calibrated with real reviewed data.
+Passing this local gate makes a candidate eligible for a later approval process;
+it does not register, promote, or deploy a model.

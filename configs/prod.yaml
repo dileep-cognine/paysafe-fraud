@@ -24,18 +24,22 @@ features:
 model:
   name: "paysafe-fraud-detector"
   alias: "champion"
-  algorithm: "HistGradientBoostingClassifier"
+  algorithm: "LogisticRegression"
   parameters:
-    max_iter: 200
-    learning_rate: 0.05
-    max_depth: 7
+    max_iter: 1000
+    class_weight: "balanced"
     random_state: 42
+  artifact_path: "artifacts/model/candidate_prod.joblib"
 
 evaluation:
   thresholds:
+    min_precision: 0.10
+    min_recall: 0.70
+    min_f1: 0.15
     min_roc_auc: 0.80
     min_pr_auc: 0.45
     min_precision_at_recall_80: 0.40
+  metrics_path: "artifacts/evaluation/metrics_prod.json"
 
 mlflow:
   tracking_uri: "sqlite:///mlruns.db"
