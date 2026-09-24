@@ -49,7 +49,26 @@ SERVING_FEATURES = ["amount", "merchant_category", "hour_of_day", "device_risk"]
 
 ---
 
-## 3. Data Quality Rules & Gates
+## 3. Shared Feature Builder and Train/Serve Consistency
+
+`src/fraud_scoring/features.py` owns the ordered model contract and is the only place that builds estimator input:
+
+```text
+transaction_id  -> identity and audit context only
+amount          -> float64 model feature
+merchant_category -> string model feature
+hour_of_day     -> int64 model feature
+device_risk     -> float64 model feature
+is_fraud        -> int64 training target only
+```
+
+`build_training_features()` returns the model matrix and target. `build_serving_features()` returns the same model matrix from a label-free authorization request. Both call the same internal transformation, enforce the same input types, and return the same fixed column order. The builder has no fitted state or learned encoding yet; a later training stage will fit preprocessing once and reuse it for inference.
+
+`tests/test_train_serve_consistency.py` supplies the same raw transactions to both paths and asserts identical columns, order, values, and dtypes. It also asserts that neither the identity nor target reaches a model matrix.
+
+---
+
+## 4. Data Quality Rules & Gates
 
 The validation suite (`src/fraud_scoring/data_validation.py`) enforces:
 
@@ -65,7 +84,7 @@ The validation suite (`src/fraud_scoring/data_validation.py`) enforces:
 
 ---
 
-## 4. Leakage Prevention Architecture
+## 5. Leakage Prevention Architecture
 
 Data leakage is defended against at multiple layers:
 
@@ -82,7 +101,7 @@ The schema validates values as supplied. It never coerces strings to numbers or 
 
 ---
 
-## 5. How to Run Validation & Tests
+## 6. How to Run Validation & Tests
 
 ### Run Data Quality Validation on Raw Data
 ```bash
@@ -102,4 +121,5 @@ python -m fraud_scoring.generate_data --records 5000 --fraud-ratio 0.04
 ### Run Automated Tests
 ```bash
 pytest tests/test_data_validation.py
+pytest tests/test_features.py tests/test_train_serve_consistency.py
 ```

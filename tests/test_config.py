@@ -2,7 +2,19 @@ from pathlib import Path
 
 import pytest
 
-from fraud_scoring.config import AppConfig, load_config, resolve_config_path
+from fraud_scoring.config import (
+    ENVIRONMENT_OVERRIDES,
+    AppConfig,
+    load_config,
+    resolve_config_path,
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_configuration_environment(monkeypatch):
+    """Keep committed-profile tests independent of a developer's local .env."""
+    for variable in ("APP_ENV", "CONFIG_PATH", *ENVIRONMENT_OVERRIDES):
+        monkeypatch.delenv(variable, raising=False)
 
 
 def test_load_dev_config():
@@ -68,6 +80,15 @@ def test_env_var_override(monkeypatch):
     config = load_config("configs/dev.yaml", force_reload=True)
     assert config.mlflow.tracking_uri == "sqlite:///test_override.db"
     assert config.model.alias == "test_candidate"
+
+
+def test_explicit_config_path_ignores_app_env(monkeypatch):
+    """An explicit profile must not be relabelled by the runner's APP_ENV."""
+    monkeypatch.setenv("APP_ENV", "ci")
+
+    config = load_config("configs/dev.yaml", force_reload=True)
+
+    assert config.environment == "dev"
 
 
 def test_unknown_environment_fails_loudly(monkeypatch):

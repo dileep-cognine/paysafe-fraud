@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Local development may use .env. Existing process variables, including CI
+# secrets, remain authoritative because override is deliberately False.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 class StrictConfigModel(BaseModel):
@@ -141,7 +147,10 @@ def load_config(config_path: Optional[str | Path] = None, force_reload: bool = F
     for env_var, (section, key) in ENVIRONMENT_OVERRIDES.items():
         if env_var in os.environ:
             raw_yaml.setdefault(section, {})[key] = os.environ[env_var]
-    if "APP_ENV" in os.environ:
+    # APP_ENV selects the default file when no explicit configuration was requested.
+    # An explicitly supplied config file is authoritative, which keeps validation
+    # and tests for other environments independent of the process environment.
+    if config_path is None and "APP_ENV" in os.environ:
         raw_yaml["environment"] = os.environ["APP_ENV"]
 
     try:
