@@ -6,13 +6,13 @@
 [![DVC](https://img.shields.io/badge/data-DVC-945DD6.svg)](https://dvc.org/)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 
-An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, and MLflow experiment tracking. Registry promotion, serving, and deployment are planned later stages.
+An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, MLflow experiment tracking, and explicit gated registry promotion. Serving and deployment are planned later stages.
 
 ---
 
 ## 1. System Architecture & Flow
 
-The planned lifecycle is shown below; this repository currently implements through MLflow tracking:
+The planned lifecycle is shown below; this repository currently implements through explicit model promotion:
 
 ```text
 Raw Data (CSV)
@@ -144,7 +144,7 @@ pip install -e ".[dev]"
 
 Configuration is managed via YAML files in `configs/` merged with environment variables:
 
-| Environment | Config File | Model Alias Loaded | Min ROC-AUC Threshold |
+| Environment | Config File | Configured Model Alias | Min ROC-AUC Threshold |
 | :--- | :--- | :--- | :--- |
 | **Development** (`dev`) | `configs/dev.yaml` | `champion` | 0.70 |
 | **Continuous Integration** (`ci`) | `configs/ci.yaml` | `challenger` | 0.70 |
@@ -209,8 +209,8 @@ Git. The evaluation command exits nonzero if any configured threshold is missed.
 The dev/CI thresholds are demonstration gates chosen from the measured 5,000-row
 synthetic sample; they are not business acceptance criteria. Production has
 stricter configured thresholds and must be calibrated with real reviewed data.
-Passing this local gate makes a candidate eligible for a later approval process;
-it does not register, promote, or deploy a model.
+Passing this local gate makes a candidate eligible for a separate approval and
+promotion command; training alone does not register, promote, or deploy a model.
 
 ## 8. MLflow experiment tracking
 
@@ -218,7 +218,8 @@ it does not register, promote, or deploy a model.
 applies the existing quality gate, and records the complete candidate experiment
 in MLflow. The standalone evaluation command remains available to recheck a
 saved candidate. The run is recorded even when the gate fails; in that case the
-training command exits nonzero after logging. No model is registered or promoted.
+training command exits nonzero after logging. Training itself never registers or
+promotes a model.
 
 The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
@@ -249,3 +250,36 @@ are tagged when applicable. A `git_commit` tag is added only when Git returns an
 actual commit hash. The SHA-256 tag fingerprints the raw bytes; it is not a
 fabricated DVC version. MLflow may display the candidate under its logged-model
 section; that alone does not create a registered production model or alias.
+
+## 9. Explicit model promotion and rollback
+
+Training creates a **candidate**: a fitted model under evaluation. An MLflow
+**run** holds the actual metrics and gate result. A **registered model** is the
+configured name that groups approved **versions**. The mutable **alias**
+(`champion` in the dev profile) points to one approved version. Training never
+moves that alias. The current implementation does not serve a model yet.
+
+After reviewing a completed run, an authorized model owner can promote its
+printed run ID and logged-model URI. Use the same configuration profile and
+tracking store as the training command:
+
+```bash
+python -m fraud_scoring.model_registry promote --config configs/dev.yaml --run-id <RUN_ID> --model-uri models:/<LOGGED_MODEL_ID>
+```
+
+The command checks that the run finished in the configured experiment and
+environment, has a `PASS` tag, and has all six recorded metrics meeting the
+currently configured Stage 4 thresholds. It also checks that the logged model
+belongs to that run and is ready. A failed check exits without registering or
+moving the alias. An eligible model is registered under `MODEL_REGISTRY_NAME`,
+then the configured `MODEL_ALIAS` is assigned to its version. Repeating the
+command reuses the version; older versions remain in the registry. Version
+tags include the training run ID, gate status, environment, model type, and a
+Git commit only when one exists.
+
+To roll back, find the earlier approved version's `training_run_id` tag and
+logged-model ID in MLflow, review its metrics, then run the same `promote`
+command with that run ID and its original `models:/m-...` URI. The gate is
+checked again against the selected profile's current thresholds. The alias
+moves back to the existing version without deleting the newer version. See
+`docs/branch-protection.md` for proposed approval roles and ownership.
