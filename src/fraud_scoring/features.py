@@ -1,9 +1,8 @@
 """Shared, deterministic feature contract for fraud-scoring training and serving.
 
-This module intentionally performs no learned encoding. A future training
-pipeline can fit an encoder on the stable output of this builder, then reuse
-that fitted encoder during inference. Both paths must call the functions here
-before reaching that preprocessing step.
+This module intentionally performs no learned encoding. The fitted training
+pipeline contains the encoder, which inference reloads with the classifier.
+Both paths call the functions here before that preprocessing step.
 """
 
 from __future__ import annotations

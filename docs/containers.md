@@ -1,0 +1,73 @@
+# Container runtime
+
+The Stage 8 image packages only the FastAPI service, its runtime dependencies,
+and the committed configuration profiles. It uses the pinned
+`python:3.13.13-slim-bookworm` official image digest because that Python version
+matches the validated project environment while the slim Debian image keeps the
+runtime base small. The Dockerfile has a builder stage that produces package
+wheels and a separate runtime stage that installs only those wheels.
+
+Build the image from the repository root:
+
+```bash
+docker build --tag paysafe-fraud-scoring:latest .
+```
+
+Run it with runtime configuration supplied by the deployment environment. Do
+not pass a committed `.env` file or copy credentials into the image.
+
+```bash
+docker run --rm --publish 8000:8000 \
+  --env APP_ENV=prod \
+  --env MLFLOW_TRACKING_URI=https://mlflow.example.internal \
+  --env MLFLOW_EXPERIMENT_NAME=paysafe-fraud-scoring-prod \
+  --env MODEL_REGISTRY_NAME=paysafe-fraud-detector \
+  --env MODEL_ALIAS=champion \
+  --env API_HOST=0.0.0.0 \
+  --env API_PORT=8000 \
+  --env API_WORKERS=1 \
+  --env LOG_LEVEL=INFO \
+  paysafe-fraud-scoring:latest
+```
+
+The application resolves `models:/<MODEL_REGISTRY_NAME>@<MODEL_ALIAS>` on
+startup. It does not train, bundle, or hardcode a model version. A production
+container therefore needs network access and credentials, when required, for a
+reachable MLflow tracking and registry service. The default local SQLite URI is
+not suitable as a container registry backend: its database and local artifacts
+live on the host filesystem and are not a shared production service.
+
+The local Stage 8 verification confirmed that the existing SQLite registry
+records model artifacts using Windows `file:` paths. A Linux container cannot
+resolve those host paths, even if the database file is mounted. Configure a
+network-reachable MLflow server with remotely accessible or proxied artifacts
+before running `/score` in a container. This preserves the approved-alias
+architecture instead of copying a local candidate artifact into the image.
+
+Check the running image:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/docs
+docker exec <container-id> whoami
+docker image ls paysafe-fraud-scoring:latest
+```
+
+`whoami` should print `appuser`, not `root`. Docker also runs the configured
+`HEALTHCHECK`, which performs `GET /health` without sending transaction data.
+
+The image built locally as `paysafe-fraud-scoring:latest` was 470.1 MB. It was
+verified with `docker run --rm --entrypoint whoami paysafe-fraud-scoring:latest`,
+which returned `appuser`. Health, Swagger, and scoring must be exercised against
+the deployment MLflow server described above; no fabricated container score is
+recorded for the local SQLite store.
+
+Use a scanner appropriate for the build environment before publishing an image:
+
+```bash
+trivy image paysafe-fraud-scoring:latest
+```
+
+Trivy was not installed in this development environment, so no vulnerability
+scan result is claimed here. Record the actual scan output in the deployment
+review rather than assuming a clean image.

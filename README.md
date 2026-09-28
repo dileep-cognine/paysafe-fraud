@@ -6,13 +6,13 @@
 [![DVC](https://img.shields.io/badge/data-DVC-945DD6.svg)](https://dvc.org/)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 
-An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, MLflow experiment tracking, and explicit gated registry promotion. Serving and deployment are planned later stages.
+An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, MLflow experiment tracking, explicit gated registry promotion, and a local FastAPI scoring service. Container deployment is planned for a later stage.
 
 ---
 
 ## 1. System Architecture & Flow
 
-The planned lifecycle is shown below; this repository currently implements through explicit model promotion:
+The planned lifecycle is shown below; this repository currently implements through the FastAPI scoring service:
 
 ```text
 Raw Data (CSV)
@@ -130,7 +130,7 @@ pip install -e ".[dev]"
 ### 4.3 Dependency Management Strategy
 - `pyproject.toml` is the source of truth for direct runtime and development dependencies.
 - `requirements.txt` and `requirements-dev.txt` are compatible direct-dependency lists for plain `pip` and container builds.
-- `requirements.lock` records the complete resolved environment used by CI and release builds. Refresh it only in a clean virtual environment after intentionally changing dependencies:
+- `requirements.lock` is a pip constraints file containing the resolved environment used by CI and container builds. Refresh it only in a clean virtual environment after intentionally changing dependencies:
 
   ```bash
   pip install -e ".[dev]"
@@ -257,7 +257,8 @@ Training creates a **candidate**: a fitted model under evaluation. An MLflow
 **run** holds the actual metrics and gate result. A **registered model** is the
 configured name that groups approved **versions**. The mutable **alias**
 (`champion` in the dev profile) points to one approved version. Training never
-moves that alias. The current implementation does not serve a model yet.
+moves that alias. The API in Stage 7 serves the approved version; it never
+loads an unpromoted training candidate.
 
 After reviewing a completed run, an authorized model owner can promote its
 printed run ID and logged-model URI. Use the same configuration profile and
@@ -283,3 +284,66 @@ command with that run ID and its original `models:/m-...` URI. The gate is
 checked again against the selected profile's current thresholds. The alias
 moves back to the existing version without deleting the newer version. See
 `docs/branch-protection.md` for proposed approval roles and ownership.
+
+## 10. Local FastAPI scoring service
+
+Start the service from the repository root after promoting a passing candidate:
+
+```bash
+python -m fraud_scoring.api --config configs/dev.yaml
+```
+
+The command uses `API_HOST`, `API_PORT`, `API_WORKERS`, and `LOG_LEVEL` from the
+selected YAML profile and environment overrides. The development port defaults
+to 8000. If it is occupied, set `API_PORT` to an unused port before starting.
+For local-only access, set `API_HOST=127.0.0.1`. Visit `/docs` on that host and
+port for the generated Swagger UI.
+
+At startup, the API resolves `models:/<MODEL_REGISTRY_NAME>@<MODEL_ALIAS>` in
+MLflow, checks the version's passing gate tag, and loads the complete fitted
+scikit-learn pipeline. It pins the resolved version in memory. A missing or
+unloadable champion aborts startup; `/health` reports model readiness. Moving
+the alias later does not change an already running process: restart the API to
+load the newly approved version. Each response reports the version that process
+actually loaded.
+
+`POST /score` accepts `transaction_id` (identity only), `amount` (> 0), one of
+the allowed `merchant_category` values, `hour_of_day` (integer 0–23), and
+`device_risk` (0–1). Extra fields, including `is_fraud`, are rejected. The
+request passes through the shared serving feature builder; only its four
+non-identity features reach the fitted pipeline. `risk_score` is the model's
+probability for fraud class 1. No training label is returned.
+
+```bash
+curl -X POST "http://127.0.0.1:8000/score" \
+  -H "Content-Type: application/json" \
+  -d '{"transaction_id":"txn-1001","amount":125.50,"merchant_category":"electronics","hour_of_day":14,"device_risk":0.23}'
+```
+
+The response has numeric `risk_score` (0–1) and string `model_version` fields.
+Invalid requests return 422; an unavailable model returns 503; unexpected
+prediction failures return a generic 500 while details stay in server logs.
+Logs record the model version and request duration without transaction values.
+
+In one local verification on 2026-09-25, the approved synthetic-data model
+returned `{"risk_score":0.31914670174006454,"model_version":"2"}` for the
+request above. Ten sequential local HTTP requests had a 16.95 ms median and
+185.87 ms maximum observed latency (also the nearest-rank p95 for 10 samples).
+These are local measurements, not a production latency guarantee. The value
+and version will change when the approved alias points to a different model.
+
+## 11. Production-style Docker image
+
+Build the Stage 8 image with `docker build --tag paysafe-fraud-scoring:latest .`.
+It uses a pinned Python 3.13.13 slim Bookworm image, multi-stage wheel build,
+non-root `appuser`, a `/health` Docker health check, and a `.dockerignore` that
+excludes local data, MLflow state, tests, source-control files, virtual
+environments, and `.env` files. It never embeds a model, database, or secret.
+
+The image starts the same FastAPI factory without reload and reads its runtime
+configuration from environment variables. Supply a reachable MLflow registry
+URI and the configured model name and alias when running it. The image resolves
+the approved alias at startup; it cannot use the host's local SQLite tracking
+store as a production registry. The local image was built at 470.1 MB and
+verified to run as non-root `appuser`. See [container instructions](docs/containers.md)
+for the build, run, health, non-root, image-size, and scan commands.

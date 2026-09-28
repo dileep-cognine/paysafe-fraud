@@ -9,6 +9,7 @@ from pathlib import Path
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+from mlflow.data.pandas_dataset import from_pandas
 from mlflow.models import infer_signature
 
 from fraud_scoring.config import AppConfig
@@ -81,7 +82,7 @@ def _log_results(result: EvaluationResult, raw: pd.DataFrame) -> None:
 def _log_dataset(raw: pd.DataFrame, data_path: Path, candidate: CandidateArtifact) -> None:
     source = str(data_path.resolve())
     mlflow.log_input(
-        mlflow.data.from_pandas(
+        from_pandas(
             raw,
             source=source,
             targets=TARGET_COLUMN,
@@ -111,7 +112,10 @@ def _log_model(candidate: CandidateArtifact, raw: pd.DataFrame) -> str:
         pyfunc_predict_fn="predict_proba",
         serialization_format="cloudpickle",
     )
-    return model_info.model_uri
+    model_uri = model_info.model_uri
+    if not isinstance(model_uri, str):
+        raise TypeError("MLflow did not return a model URI for the logged candidate.")
+    return model_uri
 
 
 def run_training_experiment(data_path: Path, config: AppConfig) -> ExperimentOutcome:
