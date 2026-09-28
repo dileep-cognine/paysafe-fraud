@@ -53,6 +53,7 @@ mlruns_ci.db
 /data/processed/*.parquet
 /data/processed/*.json
 /models/*
+/artifacts/
 !/data/raw/.gitkeep
 !/data/processed/.gitkeep
 !/data/README.md

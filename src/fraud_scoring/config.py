@@ -52,9 +52,13 @@ class ModelConfig(StrictConfigModel):
     alias: str = "champion"
     algorithm: str = "HistGradientBoostingClassifier"
     parameters: Dict[str, Any] = Field(default_factory=dict)
+    artifact_path: str = "artifacts/model/candidate.joblib"
 
 
 class EvaluationThresholds(StrictConfigModel):
+    min_precision: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_recall: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_f1: float = Field(default=0.0, ge=0.0, le=1.0)
     min_roc_auc: float = Field(default=0.70, ge=0.0, le=1.0)
     min_pr_auc: float = Field(default=0.30, ge=0.0, le=1.0)
     min_precision_at_recall_80: float = Field(default=0.20, ge=0.0, le=1.0)
@@ -62,6 +66,7 @@ class EvaluationThresholds(StrictConfigModel):
 
 class EvaluationConfig(StrictConfigModel):
     thresholds: EvaluationThresholds = Field(default_factory=EvaluationThresholds)
+    metrics_path: str = "artifacts/evaluation/metrics.json"
 
 
 class MLflowConfig(StrictConfigModel):
