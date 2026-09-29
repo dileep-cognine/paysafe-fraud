@@ -44,6 +44,18 @@ def test_valid_score_uses_serving_features_and_loads_once(client):
     assert "is_fraud" not in features.columns
 
 
+def test_model_info_reports_active_non_sensitive_metadata(client):
+    test_client, _, _ = client
+    response = test_client.get("/model-info")
+    assert response.status_code == 200
+    assert response.json() == {
+        "model_name": "paysafe-fraud-detector",
+        "model_alias": "champion",
+        "model_version": "7",
+        "environment": "dev",
+    }
+
+
 def test_alias_category_is_normalized_before_model_inference(client):
     test_client, model, _ = client
     response = test_client.post("/score", json={**VALID_REQUEST, "merchant_category": "Phone Shop"})
@@ -111,4 +123,5 @@ def test_uninitialized_model_returns_503(monkeypatch):
     monkeypatch.setattr(api, "load_champion", Mock())
     test_client = TestClient(api.create_app(load_config("configs/dev.yaml")))
     assert test_client.get("/health").status_code == 503
+    assert test_client.get("/model-info").status_code == 503
     assert test_client.post("/score", json=VALID_REQUEST).status_code == 503
