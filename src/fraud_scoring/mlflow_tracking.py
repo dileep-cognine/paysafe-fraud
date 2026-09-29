@@ -122,11 +122,13 @@ def run_training_experiment(data_path: Path, config: AppConfig) -> ExperimentOut
     """Train, evaluate, and track the real candidate, including a failed gate."""
     configure_tracking(config)
     with mlflow.start_run(run_name="baseline-logistic-regression") as run:
-        mlflow.set_tags({
-            "project": "paysafe-fraud-scoring",
-            "environment": config.environment,
-            "model_type": config.model.algorithm,
-        })
+        mlflow.set_tags(
+            {
+                "project": "paysafe-fraud-scoring",
+                "environment": config.environment,
+                "model_type": config.model.algorithm,
+            }
+        )
         commit = _git_commit()
         if commit:
             mlflow.set_tag("git_commit", commit)

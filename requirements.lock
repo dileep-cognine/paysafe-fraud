@@ -53,7 +53,6 @@ flask-cors==6.0.5
 flatten-dict==0.5.0
 flufl.lock==9.1.0
 fonttools==4.65.0
--e git+https://github.com/dileep-cognine/paysafe-fraud.git@64a4485f1a6cab9a17df4a5ba6c7270c199075b7#egg=fraud_scoring
 frozenlist==1.8.0
 fsspec==2026.9.0
 funcy==2.1

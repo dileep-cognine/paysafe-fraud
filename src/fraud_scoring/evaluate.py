@@ -62,9 +62,13 @@ def evaluate_candidate(
 ) -> EvaluationResult:
     """Score only the candidate's untouched holdout from the same dataset bytes."""
     if dataset_sha256(data_path) != candidate.dataset_sha256:
-        raise ValueError("Dataset SHA-256 differs from training; evaluation cannot reuse this holdout.")
+        raise ValueError(
+            "Dataset SHA-256 differs from training; evaluation cannot reuse this holdout."
+        )
     if candidate.feature_names != TRAINING_FEATURES:
-        raise ValueError("Candidate feature contract differs from the current shared feature builder.")
+        raise ValueError(
+            "Candidate feature contract differs from the current shared feature builder."
+        )
     raw = validate_and_enforce(pd.read_csv(data_path), is_training=True)
     built = build_training_features(raw)
     x_valid = built.features.iloc[candidate.validation_indices]

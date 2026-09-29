@@ -71,9 +71,7 @@ def test_failed_gate_still_records_run(experiment_setup):
     data_path, config = experiment_setup
     thresholds = config.evaluation.thresholds.model_copy(update={"min_roc_auc": 1.0})
     config = config.model_copy(
-        update={
-            "evaluation": config.evaluation.model_copy(update={"thresholds": thresholds})
-        }
+        update={"evaluation": config.evaluation.model_copy(update={"thresholds": thresholds})}
     )
     outcome = run_training_experiment(data_path, config)
     run = MlflowClient(tracking_uri=config.mlflow.tracking_uri).get_run(outcome.run_id)

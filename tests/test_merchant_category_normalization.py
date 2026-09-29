@@ -79,7 +79,9 @@ def test_invalid_llm_category_has_safe_unknown_fallback(response: str | None):
 def test_llm_error_has_safe_unknown_fallback():
     result = normalize_merchant_category(
         "unfamiliar merchant",
-        normalizer=MerchantCategoryNormalizer(StubClassifier(error=TimeoutError()), llm_enabled=True),
+        normalizer=MerchantCategoryNormalizer(
+            StubClassifier(error=TimeoutError()), llm_enabled=True
+        ),
     )
     assert result.category is None
     assert result.source == "unknown"
@@ -88,7 +90,15 @@ def test_llm_error_has_safe_unknown_fallback():
 def test_standardized_category_reaches_existing_preprocessing_contract():
     features = build_serving_features(
         pd.DataFrame(
-            [{"transaction_id": "txn-1", "amount": 45.0, "merchant_category": "phone_shop", "hour_of_day": 12, "device_risk": 0.2}]
+            [
+                {
+                    "transaction_id": "txn-1",
+                    "amount": 45.0,
+                    "merchant_category": "phone_shop",
+                    "hour_of_day": 12,
+                    "device_risk": 0.2,
+                }
+            ]
         )
     )
     assert features.loc[0, "merchant_category"] == "electronics"
