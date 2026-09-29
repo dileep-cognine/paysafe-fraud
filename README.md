@@ -1,4 +1,4 @@
-# PaySafe Fraud Scoring MLOps Pipeline
+﻿# PaySafe Fraud Scoring MLOps Pipeline
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -16,25 +16,25 @@ The planned lifecycle is shown below; this repository currently implements throu
 
 ```text
 Raw Data (CSV)
-   ↓
+   â†“
 Schema & Data Quality Validation (Pandera + Missingness/Range/Vocab checks)
-   ↓
+   â†“
 Leakage Checks (Assert target is absent from serve schemas)
-   ↓
+   â†“
 Shared Feature Builder (Exact same transform pipeline for Train & Serve)
-   ↓
-DVC Pipeline (Reproducible stages: prepare → train → evaluate)
-   ↓
+   â†“
+DVC Pipeline (Reproducible stages: prepare â†’ train â†’ evaluate)
+   â†“
 Model Training (HistGradientBoosting / scikit-learn)
-   ↓
+   â†“
 Evaluation & Quality Gate (ROC-AUC, PR-AUC, Precision@Recall80)
-   ↓
+   â†“
 MLflow Tracking & Model Registry (Logged parameters, metrics, artifacts, signature)
-   ↓
+   â†“
 Model Promotion (@champion / @challenger alias assigned if quality gate passes)
-   ↓
+   â†“
 FastAPI Serving API (/score endpoint loads @champion model)
-   ↓
+   â†“
 Docker Container (Multi-stage non-root container image)
 ```
 
@@ -46,11 +46,11 @@ To prevent training-serving skew and data leakage, data schemas are strictly gov
 
 | Field | Type | Train | Serve | Description |
 | :--- | :--- | :---: | :---: | :--- |
-| `transaction_id` | string | Yes | Yes | Identity only — excluded from model training features |
+| `transaction_id` | string | Yes | Yes | Identity only â€” excluded from model training features |
 | `amount` | float | Yes | Yes | Transaction amount in currency units (must be > 0) |
 | `merchant_category`| string | Yes | Yes | Merchant sector (e.g. `electronics`, `grocery`, `travel`) |
-| `hour_of_day` | int | Yes | Yes | Hour of transaction initiation (0–23) |
-| `device_risk` | float | Yes | Yes | Device risk confidence score (0.0–1.0) |
+| `hour_of_day` | int | Yes | Yes | Hour of transaction initiation (0â€“23) |
+| `device_risk` | float | Yes | Yes | Device risk confidence score (0.0â€“1.0) |
 | `is_fraud` | int/bool | **Yes** | **NO** | Target label. **Strictly forbidden at serve time (leakage)** |
 
 The **shared feature builder** (`src/fraud_scoring/features.py`) applies the fixed model-feature order and dtypes for both training and inference. Learned encoding is fitted inside the training pipeline and saved with the classifier for later inference.
@@ -61,42 +61,42 @@ The **shared feature builder** (`src/fraud_scoring/features.py`) applies the fix
 
 ```text
 paysafe-fraud-scoring/
-├── .env.example              # Template for environment secrets and endpoints
-├── configs/                  # Environment-specific configuration profiles
-│   ├── dev.yaml              # Local development configuration
-│   ├── ci.yaml               # Automated CI test configuration
-│   └── prod.yaml             # Production settings & strict quality thresholds
-├── data/
-│   ├── raw/                  # Versioned raw transactional data (.gitignored / DVC tracked)
-│   └── processed/            # Engineered datasets & feature metadata
-├── docs/                     # Architecture & operational documentation
-│   ├── branch-protection.md  # GitHub branch protection policies
-│   ├── containers.md         # Container security, multi-stage build, and SBOM
-│   ├── design.md             # System lifecycle, roles, and Definition-of-Done
-│   └── lineage.md            # DVC data lineage and DAG specifications
-├── src/
-│   └── fraud_scoring/        # Core package
-│       ├── __init__.py
-│       ├── api.py            # FastAPI scoring service (/score, /health)
-│       ├── config.py         # Type-safe configuration loader (Pydantic + YAML)
-│       ├── data_validation.py# Pandera schema checks & leakage guards
-│       ├── evaluate.py       # Model evaluation & metric calculation
-│       ├── features.py       # Shared train/serve feature transformer
-│       ├── model_registry.py # MLflow tracking & alias promotion logic
-│       ├── predict.py        # Inference pipeline & model loader
-│       └── train.py          # Model training pipeline
-├── tests/                    # Unit and integration test suite
-│   ├── test_api.py           # API endpoint tests
-│   ├── test_config.py        # Configuration validation tests
-│   ├── test_data_validation.py # Data quality & leakage tests
-│   ├── test_evaluation.py    # Quality gate & metrics tests
-│   ├── test_features.py      # Feature engineering consistency tests
-│   └── test_train_serve_consistency.py # End-to-end parity validation
-├── Dockerfile                # Multi-stage, non-root container build
-├── dvc.yaml                  # Reproducible pipeline definition
-├── pyproject.toml            # Python packaging & tool configuration
-├── requirements.txt          # Production runtime dependencies
-└── requirements-dev.txt      # Development & testing dependencies
+â”œâ”€â”€ .env.example              # Template for environment secrets and endpoints
+â”œâ”€â”€ configs/                  # Environment-specific configuration profiles
+â”‚   â”œâ”€â”€ dev.yaml              # Local development configuration
+â”‚   â”œâ”€â”€ ci.yaml               # Automated CI test configuration
+â”‚   â””â”€â”€ prod.yaml             # Production settings & strict quality thresholds
+â”œâ”€â”€ data/
+â”‚   â”œâ”€â”€ raw/                  # Versioned raw transactional data (.gitignored / DVC tracked)
+â”‚   â””â”€â”€ processed/            # Engineered datasets & feature metadata
+â”œâ”€â”€ docs/                     # Architecture & operational documentation
+â”‚   â”œâ”€â”€ branch-protection.md  # GitHub branch protection policies
+â”‚   â”œâ”€â”€ containers.md         # Container security, multi-stage build, and SBOM
+â”‚   â”œâ”€â”€ design.md             # System lifecycle, roles, and Definition-of-Done
+â”‚   â””â”€â”€ lineage.md            # DVC data lineage and DAG specifications
+â”œâ”€â”€ src/
+â”‚   â””â”€â”€ fraud_scoring/        # Core package
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â”œâ”€â”€ api.py            # FastAPI scoring service (/score, /health)
+â”‚       â”œâ”€â”€ config.py         # Type-safe configuration loader (Pydantic + YAML)
+â”‚       â”œâ”€â”€ data_validation.py# Pandera schema checks & leakage guards
+â”‚       â”œâ”€â”€ evaluate.py       # Model evaluation & metric calculation
+â”‚       â”œâ”€â”€ features.py       # Shared train/serve feature transformer
+â”‚       â”œâ”€â”€ model_registry.py # MLflow tracking & alias promotion logic
+â”‚       â”œâ”€â”€ predict.py        # Inference pipeline & model loader
+â”‚       â””â”€â”€ train.py          # Model training pipeline
+â”œâ”€â”€ tests/                    # Unit and integration test suite
+â”‚   â”œâ”€â”€ test_api.py           # API endpoint tests
+â”‚   â”œâ”€â”€ test_config.py        # Configuration validation tests
+â”‚   â”œâ”€â”€ test_data_validation.py # Data quality & leakage tests
+â”‚   â”œâ”€â”€ test_evaluation.py    # Quality gate & metrics tests
+â”‚   â”œâ”€â”€ test_features.py      # Feature engineering consistency tests
+â”‚   â””â”€â”€ test_train_serve_consistency.py # End-to-end parity validation
+â”œâ”€â”€ Dockerfile                # Multi-stage, non-root container build
+â”œâ”€â”€ dvc.yaml                  # Reproducible pipeline definition
+â”œâ”€â”€ pyproject.toml            # Python packaging & tool configuration
+â”œâ”€â”€ requirements.txt          # Production runtime dependencies
+â””â”€â”€ requirements-dev.txt      # Development & testing dependencies
 ```
 
 ---
@@ -308,8 +308,8 @@ load the newly approved version. Each response reports the version that process
 actually loaded.
 
 `POST /score` accepts `transaction_id` (identity only), `amount` (> 0), one of
-the allowed `merchant_category` values, `hour_of_day` (integer 0–23), and
-`device_risk` (0–1). Extra fields, including `is_fraud`, are rejected. The
+the allowed `merchant_category` values, `hour_of_day` (integer 0â€“23), and
+`device_risk` (0â€“1). Extra fields, including `is_fraud`, are rejected. The
 request passes through the shared serving feature builder; only its four
 non-identity features reach the fitted pipeline. `risk_score` is the model's
 probability for fraud class 1. No training label is returned.
@@ -320,10 +320,39 @@ curl -X POST "http://127.0.0.1:8000/score" \
   -d '{"transaction_id":"txn-1001","amount":125.50,"merchant_category":"electronics","hour_of_day":14,"device_risk":0.23}'
 ```
 
-The response has numeric `risk_score` (0–1) and string `model_version` fields.
+The response has numeric `risk_score` (0â€“1) and string `model_version` fields.
 Invalid requests return 422; an unavailable model returns 503; unexpected
 prediction failures return a generic 500 while details stay in server logs.
 Logs record the model version and request duration without transaction values.
+
+### Merchant category normalization
+
+`merchant_category` is normalized in the shared feature contract before the
+fitted encoder receives it. Known formatting and aliases use the centralized
+deterministic mapping: for example, `Phone Shop` and `mobile-store` become
+`electronics`, while `restaurant` becomes `dining`. Training applies those
+same deterministic mappings before data-quality validation, and `/score` uses
+the same component before inference. This prevents train/serve skew without
+changing the estimator input columns or the `/score` response schema.
+
+The approved model vocabulary remains `grocery`, `electronics`, `fashion`,
+`travel`, `gaming`, `dining`, `crypto`, and `utilities`. No new category is
+accepted at runtime because the fitted one-hot encoder was trained on that
+contract. Book-related labels currently take the safe unknown path: there is
+no approved books/retail category in the assessment dataset. The API returns
+422 before prediction for such a value until a business owner approves a
+mapping and the model is retrained if the vocabulary changes.
+
+Optional LLM classification is disabled by default. Set
+`LLM_CATEGORY_MAPPING_ENABLED=true`, configure
+`LLM_CATEGORY_MAPPING_MODEL`, `LLM_CATEGORY_MAPPING_BASE_URL`, and
+`LLM_CATEGORY_MAPPING_TIMEOUT_SECONDS`. The local Ollama provider receives
+only the normalized category and allowed list;
+it is instructed to return structured JSON with one allowed category or
+`unknown`. Its response is validated again in the application. Invalid JSON,
+timeouts, missing credentials, provider errors, and categories outside the
+approved list all take the safe unknown path and never reach the model. Do not
+install Ollama locally and pull the selected model before enabling it.
 
 In one local verification on 2026-09-25, the approved synthetic-data model
 returned `{"risk_score":0.31914670174006454,"model_version":"2"}` for the
@@ -347,3 +376,4 @@ the approved alias at startup; it cannot use the host's local SQLite tracking
 store as a production registry. The local image was built at 470.1 MB and
 verified to run as non-root `appuser`. See [container instructions](docs/containers.md)
 for the build, run, health, non-root, image-size, and scan commands.
+

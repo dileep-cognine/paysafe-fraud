@@ -82,6 +82,18 @@ def test_env_var_override(monkeypatch):
     assert config.model.alias == "test_candidate"
 
 
+def test_llm_category_mapping_environment_overrides(monkeypatch):
+    monkeypatch.setenv("LLM_CATEGORY_MAPPING_ENABLED", "true")
+    monkeypatch.setenv("LLM_CATEGORY_MAPPING_MODEL", "test-model")
+    monkeypatch.setenv("LLM_CATEGORY_MAPPING_TIMEOUT_SECONDS", "2.5")
+
+    config = load_config("configs/dev.yaml", force_reload=True)
+
+    assert config.features.llm_category_mapping_enabled is True
+    assert config.features.llm_category_mapping_model == "test-model"
+    assert config.features.llm_category_mapping_timeout_seconds == 2.5
+
+
 def test_explicit_config_path_ignores_app_env(monkeypatch):
     """An explicit profile must not be relabelled by the runner's APP_ENV."""
     monkeypatch.setenv("APP_ENV", "ci")
