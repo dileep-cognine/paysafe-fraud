@@ -75,7 +75,7 @@ def _require_logged_model(client: MlflowClient, model_uri: str, run_id: str) -> 
     prefix = "models:/"
     if not model_uri.startswith(prefix):
         raise PromotionRejected("Model URI must be a logged-model URI (models:/m-...).")
-    model_id = model_uri[len(prefix):]
+    model_id = model_uri[len(prefix) :]
     if not model_id.startswith("m-") or "/" in model_id or "@" in model_id:
         raise PromotionRejected("Model URI must identify one logged model, not a registry alias.")
     try:
@@ -85,7 +85,9 @@ def _require_logged_model(client: MlflowClient, model_uri: str, run_id: str) -> 
             raise PromotionRejected(f"Logged model {model_id} was not found.") from exc
         raise
     if logged_model.source_run_id != run_id or logged_model.status != "READY":
-        raise PromotionRejected("Logged model is not ready or does not belong to the requested run.")
+        raise PromotionRejected(
+            "Logged model is not ready or does not belong to the requested run."
+        )
     return model_id
 
 

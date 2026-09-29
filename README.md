@@ -173,9 +173,11 @@ Run the test suite:
 pytest
 ```
 
-Run code formatting and lint checks:
+Run code formatting, lint, and type checks:
 ```bash
-ruff check .
+python -m ruff format --check src tests
+python -m ruff check .
+python -m mypy src
 ```
 
 Verify configuration loader:
@@ -351,8 +353,8 @@ only the normalized category and allowed list;
 it is instructed to return structured JSON with one allowed category or
 `unknown`. Its response is validated again in the application. Invalid JSON,
 timeouts, missing credentials, provider errors, and categories outside the
-approved list all take the safe unknown path and never reach the model. Do not
-install Ollama locally and pull the selected model before enabling it.
+approved list all take the safe unknown path and never reach the model. Install
+Ollama locally and pull the selected model before enabling it.
 
 In one local verification on 2026-09-25, the approved synthetic-data model
 returned `{"risk_score":0.31914670174006454,"model_version":"2"}` for the
@@ -376,4 +378,35 @@ the approved alias at startup; it cannot use the host's local SQLite tracking
 store as a production registry. The local image was built at 470.1 MB and
 verified to run as non-root `appuser`. See [container instructions](docs/containers.md)
 for the build, run, health, non-root, image-size, and scan commands.
+
+## 12. Development workflow and CI
+
+Use short-lived branches and pull requests for every change:
+
+```text
+feature branch → pull request → CI → review → main
+```
+
+1. Create a descriptive branch such as `feature/api` or `fix/model-loading`.
+2. Implement the change and run the local checks below.
+3. Push the branch and open a pull request targeting `main`.
+4. GitHub Actions runs formatting, linting, type checks, tests, data validation,
+   Docker build validation, and secret hygiene checks.
+5. Obtain review and merge only after the required checks pass.
+
+```bash
+python -m ruff format --check src tests
+python -m ruff check .
+python -m mypy src
+python -m pytest
+python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
+docker build --tag paysafe-fraud-scoring:local .
+```
+
+The CI workflow runs for pull requests targeting `main` and pushes to `main`.
+It uses temporary local MLflow stores in tests and has no personal or production
+credentials. It builds an image for validation only; it does not push or deploy
+the image. Model promotion remains separate: `training → evaluation → quality
+gate → explicit authorized promotion`. See [branch-protection guidance](docs/branch-protection.md)
+for the GitHub settings a repository maintainer should configure manually.
 

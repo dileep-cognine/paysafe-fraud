@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -10,7 +11,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint, type check, test, and validate data
+    name: Format, lint, type check, test, and validate data
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -43,6 +44,9 @@ jobs:
       - name: Lint
         run: python -m ruff check .
 
+      - name: Formatting check
+        run: python -m ruff format --check src tests
+
       - name: Type check
         run: python -m mypy src
 
@@ -61,3 +65,37 @@ jobs:
           name: test-report
           path: reports/junit.xml
           if-no-files-found: warn
+
+  docker-build:
+    name: Build Docker image
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build image without pushing it
+        run: docker build --tag "paysafe-fraud-scoring:${{ github.sha }}" .
+
+  secret-hygiene:
+    name: Verify secret hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out source with history for secret scan
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify local environment files are ignored
+        run: |
+          git check-ignore --quiet .env
+          ! git ls-files --error-unmatch .env
+
+      - name: Scan committed history for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -48,18 +48,26 @@ def test_promotion_rejection_alias_movement_and_rollback(tmp_path):
     assert first_version.run_id == first.run_id
     assert first_version.tags["training_run_id"] == first.run_id
     assert first_version.tags["quality_gate_status"] == "PASS"
-    assert str(client.get_model_version_by_alias(config.model.name, config.model.alias).version) == promoted_first.version
+    assert (
+        str(client.get_model_version_by_alias(config.model.name, config.model.alias).version)
+        == promoted_first.version
+    )
     assert mlflow.pyfunc.load_model(f"models:/{config.model.name}@{config.model.alias}")
 
     failed_thresholds = config.evaluation.thresholds.model_copy(update={"min_roc_auc": 1.0})
     failing_config = config.model_copy(
-        update={"evaluation": config.evaluation.model_copy(update={"thresholds": failed_thresholds})}
+        update={
+            "evaluation": config.evaluation.model_copy(update={"thresholds": failed_thresholds})
+        }
     )
     failed = run_training_experiment(data_path, failing_config)
     assert not failed.evaluation.passed
     with pytest.raises(PromotionRejected, match="thresholds were not met"):
         promote_model(config, failed.run_id, failed.model_uri)
-    assert str(client.get_model_version_by_alias(config.model.name, config.model.alias).version) == promoted_first.version
+    assert (
+        str(client.get_model_version_by_alias(config.model.name, config.model.alias).version)
+        == promoted_first.version
+    )
     assert len(client.search_model_versions(f"name = '{config.model.name}'")) == 1
 
     second = run_training_experiment(data_path, config)
@@ -68,8 +76,13 @@ def test_promotion_rejection_alias_movement_and_rollback(tmp_path):
         promote_model(config, second.run_id, first.model_uri)
     promoted_second = promote_model(config, second.run_id, second.model_uri)
     assert promoted_second.previous_version == promoted_first.version
-    assert str(client.get_model_version_by_alias(config.model.name, config.model.alias).version) == promoted_second.version
-    assert client.get_model_version(config.model.name, promoted_first.version).run_id == first.run_id
+    assert (
+        str(client.get_model_version_by_alias(config.model.name, config.model.alias).version)
+        == promoted_second.version
+    )
+    assert (
+        client.get_model_version(config.model.name, promoted_first.version).run_id == first.run_id
+    )
     assert len(client.search_model_versions(f"name = '{config.model.name}'")) == 2
 
     # Re-promoting an earlier approved artifact moves the alias back without
@@ -77,5 +90,8 @@ def test_promotion_rejection_alias_movement_and_rollback(tmp_path):
     rollback = promote_model(config, first.run_id, first.model_uri)
     assert rollback.version == promoted_first.version
     assert rollback.previous_version == promoted_second.version
-    assert str(client.get_model_version_by_alias(config.model.name, config.model.alias).version) == promoted_first.version
+    assert (
+        str(client.get_model_version_by_alias(config.model.name, config.model.alias).version)
+        == promoted_first.version
+    )
     assert len(client.search_model_versions(f"name = '{config.model.name}'")) == 2

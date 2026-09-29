@@ -43,6 +43,7 @@ class ScoreRequest(BaseModel):
             raise ValueError("transaction_id must not be blank")
         return value
 
+
 class ScoreResponse(BaseModel):
     risk_score: float = Field(ge=0, le=1)
     model_version: str
@@ -99,7 +100,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail="Model unavailable")
         logger.info("score_request_received model_version=%s", champion.version)
         try:
-            normalization = request.app.state.category_normalizer.normalize(payload.merchant_category)
+            normalization = request.app.state.category_normalizer.normalize(
+                payload.merchant_category
+            )
             if normalization.category is None:
                 raise FeatureContractError(
                     "'merchant_category' could not be mapped to an approved model category."
