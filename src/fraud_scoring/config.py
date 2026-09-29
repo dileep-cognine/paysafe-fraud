@@ -45,6 +45,10 @@ class FeaturesConfig(StrictConfigModel):
     derived_features: List[str] = Field(
         default_factory=lambda: ["is_night_transaction", "high_amount_risk"]
     )
+    llm_category_mapping_enabled: bool = False
+    llm_category_mapping_model: str = "qwen3-coder:30b"
+    llm_category_mapping_base_url: str = "http://127.0.0.1:11434"
+    llm_category_mapping_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
 
 
 class ModelConfig(StrictConfigModel):
@@ -106,6 +110,13 @@ ENVIRONMENT_OVERRIDES: Dict[str, tuple[str, str]] = {
     "API_PORT": ("server", "port"),
     "API_WORKERS": ("server", "workers"),
     "LOG_LEVEL": ("server", "log_level"),
+    "LLM_CATEGORY_MAPPING_ENABLED": ("features", "llm_category_mapping_enabled"),
+    "LLM_CATEGORY_MAPPING_MODEL": ("features", "llm_category_mapping_model"),
+    "LLM_CATEGORY_MAPPING_BASE_URL": ("features", "llm_category_mapping_base_url"),
+    "LLM_CATEGORY_MAPPING_TIMEOUT_SECONDS": (
+        "features",
+        "llm_category_mapping_timeout_seconds",
+    ),
 }
 
 

@@ -12,16 +12,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ALLOWED_MERCHANT_CATEGORIES = [
-    "grocery",
-    "electronics",
-    "fashion",
-    "travel",
-    "gaming",
-    "dining",
-    "crypto",
-    "utilities",
-]
+from fraud_scoring.features import STANDARD_MERCHANT_CATEGORIES
+
+ALLOWED_MERCHANT_CATEGORIES = list(STANDARD_MERCHANT_CATEGORIES)
 
 
 def generate_synthetic_transactions(

@@ -44,6 +44,14 @@ def test_valid_score_uses_serving_features_and_loads_once(client):
     assert "is_fraud" not in features.columns
 
 
+def test_alias_category_is_normalized_before_model_inference(client):
+    test_client, model, _ = client
+    response = test_client.post("/score", json={**VALID_REQUEST, "merchant_category": "Phone Shop"})
+    assert response.status_code == 200
+    features = model.predict_proba.call_args.args[0]
+    assert features.loc[0, "merchant_category"] == "electronics"
+
+
 @pytest.mark.parametrize(
     "changes",
     [

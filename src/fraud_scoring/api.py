@@ -15,8 +15,11 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
 from fraud_scoring.config import AppConfig, load_config
-from fraud_scoring.data_validation import ALLOWED_MERCHANT_CATEGORIES
-from fraud_scoring.features import FeatureContractError
+from fraud_scoring.features import (
+    FeatureContractError,
+    MerchantCategoryNormalizer,
+    OllamaMerchantCategoryClassifier,
+)
 from fraud_scoring.predict import LoadedChampion, load_champion, score_transaction
 
 logger = logging.getLogger(__name__)
@@ -40,14 +43,6 @@ class ScoreRequest(BaseModel):
             raise ValueError("transaction_id must not be blank")
         return value
 
-    @field_validator("merchant_category")
-    @classmethod
-    def allowed_merchant(cls, value: str) -> str:
-        if value not in ALLOWED_MERCHANT_CATEGORIES:
-            raise ValueError("merchant_category is not an allowed category")
-        return value
-
-
 class ScoreResponse(BaseModel):
     risk_score: float = Field(ge=0, le=1)
     model_version: str
@@ -62,9 +57,19 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     """Create an API whose lifespan loads one pinned approved model version."""
     selected = config or load_config()
     logger.setLevel(selected.server.log_level.upper())
+    classifier = OllamaMerchantCategoryClassifier(
+        selected.features.llm_category_mapping_model,
+        selected.features.llm_category_mapping_base_url,
+        selected.features.llm_category_mapping_timeout_seconds,
+    )
+    category_normalizer = MerchantCategoryNormalizer(
+        classifier=classifier,
+        llm_enabled=selected.features.llm_category_mapping_enabled,
+    )
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        application.state.category_normalizer = category_normalizer
         try:
             application.state.champion = load_champion(selected)
         except Exception as exc:
@@ -75,6 +80,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             yield
         finally:
             application.state.champion = None
+            application.state.category_normalizer = None
 
     application = FastAPI(title="PaySafe Fraud Scoring", lifespan=lifespan)
 
@@ -93,7 +99,14 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail="Model unavailable")
         logger.info("score_request_received model_version=%s", champion.version)
         try:
-            risk_score = score_transaction(champion, payload.model_dump())
+            normalization = request.app.state.category_normalizer.normalize(payload.merchant_category)
+            if normalization.category is None:
+                raise FeatureContractError(
+                    "'merchant_category' could not be mapped to an approved model category."
+                )
+            transaction = payload.model_dump()
+            transaction["merchant_category"] = normalization.category
+            risk_score = score_transaction(champion, transaction)
         except FeatureContractError as exc:
             logger.warning("score_request_rejected: %s", exc)
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -102,7 +115,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             raise HTTPException(status_code=500, detail="Prediction failed") from exc
         duration_ms = (time.perf_counter() - started) * 1000
         logger.info(
-            "score_completed model_version=%s duration_ms=%.2f", champion.version, duration_ms
+            "score_completed model_version=%s category_source=%s duration_ms=%.2f",
+            champion.version,
+            normalization.source,
+            duration_ms,
         )
         return ScoreResponse(risk_score=risk_score, model_version=champion.version)
 

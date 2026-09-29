@@ -28,7 +28,13 @@ The `merchant_category` field accepts only the following controlled categories:
 - `crypto`
 - `utilities`
 
-Any unfamiliar category triggers a schema validation error to prevent silent distribution drifts.
+Known aliases and formatting variants are normalized by the shared feature
+component before schema validation: `Phone Shop` becomes `electronics` and
+`restaurant` becomes `dining`. An unfamiliar value still triggers a schema
+validation error in training, preventing silent distribution drift. Serving
+can optionally request an LLM classification for an unfamiliar value, but the
+result is accepted only when it is in this controlled vocabulary; otherwise
+the request is rejected before scoring.
 
 ---
 
@@ -78,7 +84,9 @@ The validation suite (`src/fraud_scoring/data_validation.py`) enforces:
    - `amount > 0.0`
    - `0 <= hour_of_day <= 23`
    - `0.0 <= device_risk <= 1.0`
-4. **Vocabulary Conformance**: `merchant_category` must be an exact match to allowed values.
+4. **Vocabulary Conformance**: `merchant_category` must resolve through the
+   shared deterministic mapping to an allowed value. Unmapped training values
+   fail validation.
 5. **Strict Schema**: Unexpected/unapproved columns are rejected to prevent unversioned or leaky features from bypassing gates.
 6. **Binary Label Integrity**: Training labels must be strictly `0` or `1`.
 

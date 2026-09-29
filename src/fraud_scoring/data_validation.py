@@ -20,8 +20,10 @@ from pandera.errors import SchemaErrors
 from fraud_scoring.features import (
     IDENTITY_COLUMN,
     SERVING_FEATURES,
+    STANDARD_MERCHANT_CATEGORIES,
     TARGET_COLUMN,
     TRAINING_FEATURES,
+    normalize_merchant_category,
 )
 
 Check = pa.Check
@@ -55,16 +57,7 @@ RAW_SERVE_COLUMNS: List[str] = [
     "device_risk",
 ]
 
-ALLOWED_MERCHANT_CATEGORIES: Set[str] = {
-    "grocery",
-    "electronics",
-    "fashion",
-    "travel",
-    "gaming",
-    "dining",
-    "crypto",
-    "utilities",
-}
+ALLOWED_MERCHANT_CATEGORIES: Set[str] = set(STANDARD_MERCHANT_CATEGORIES)
 
 # Known post-authorization / post-transaction fields that must NEVER leak into features
 FORBIDDEN_LEAKAGE_COLUMNS: Set[str] = {
@@ -308,6 +301,9 @@ def validate_raw_transactions(
     Returns:
         ValidationResult object containing boolean pass/fail status and detailed error messages.
     """
+    # Training and validation use deterministic aliases only, so a provider
+    # outage cannot change a reproducible dataset or model run.
+    df = _normalize_known_merchant_categories(df)
     errors: List[str] = []
     total_records = len(df)
 
@@ -420,10 +416,29 @@ def validate_raw_transactions(
 
 def validate_and_enforce(df: pd.DataFrame, is_training: bool = True) -> pd.DataFrame:
     """Validate DataFrame and return it if valid; raises DataValidationError if invalid."""
-    result = validate_raw_transactions(df, is_training=is_training)
+    normalized_df = _normalize_known_merchant_categories(df)
+    result = validate_raw_transactions(normalized_df, is_training=is_training)
     if not result.is_valid:
         raise DataValidationError(result.report(), errors=result.errors)
-    return df
+    return normalized_df
+
+
+def _normalize_known_merchant_categories(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply shared deterministic aliases without accepting unknown values."""
+    if "merchant_category" not in df.columns:
+        return df
+    normalized_df = df.copy()
+
+    def normalized_or_original(value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        result = normalize_merchant_category(value)
+        return result.category if result.category is not None else value
+
+    normalized_df["merchant_category"] = normalized_df["merchant_category"].map(
+        normalized_or_original
+    )
+    return normalized_df
 
 
 # =====================================================================
