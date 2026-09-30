@@ -1,0 +1,107 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m fraud_scoring.prepare --input-path data/raw/transactions.csv 
+      --output-path data/processed/validated.csv
+    deps:
+    - path: data/raw/transactions.csv
+      hash: md5
+      md5: b752c24368e715d38aaf208104edbe16
+      size: 190420
+    - path: src/fraud_scoring/data_validation.py
+      hash: md5
+      md5: f24de621a845ddf47a52842ee397a67e
+      size: 17303
+    - path: src/fraud_scoring/features.py
+      hash: md5
+      md5: 26343e01f9f0b022f663f5eebe6c977f
+      size: 11316
+    - path: src/fraud_scoring/prepare.py
+      hash: md5
+      md5: 4a82b35c6ea5e0306d2bc4f11b8bb0e6
+      size: 1496
+    outs:
+    - path: data/processed/validated.csv
+      hash: md5
+      md5: b752c24368e715d38aaf208104edbe16
+      size: 190420
+  train:
+    cmd: python -m fraud_scoring.train --config configs/dev.yaml --data-path 
+      data/processed/validated.csv --output-path 
+      artifacts/model/candidate.joblib
+    deps:
+    - path: configs/dev.yaml
+      hash: md5
+      md5: 8135ecba125e8b5390442320986ad732
+      size: 1152
+    - path: data/processed/validated.csv
+      hash: md5
+      md5: b752c24368e715d38aaf208104edbe16
+      size: 190420
+    - path: src/fraud_scoring/config.py
+      hash: md5
+      md5: 452e98fa1ec1e681fee978c229c20882
+      size: 6600
+    - path: src/fraud_scoring/data_utils.py
+      hash: md5
+      md5: 261927f23b20b5eae12b32fb2b315d23
+      size: 288
+    - path: src/fraud_scoring/data_validation.py
+      hash: md5
+      md5: f24de621a845ddf47a52842ee397a67e
+      size: 17303
+    - path: src/fraud_scoring/features.py
+      hash: md5
+      md5: 26343e01f9f0b022f663f5eebe6c977f
+      size: 11316
+    - path: src/fraud_scoring/train.py
+      hash: md5
+      md5: fe407dac4cd3b7a156c04d8de60725e2
+      size: 3804
+    outs:
+    - path: artifacts/model/candidate.joblib
+      hash: md5
+      md5: 25fcd9771f7a38d4ae7ecdf88cc9b94a
+      size: 6579
+  evaluate:
+    cmd: python -m fraud_scoring.evaluate --config configs/dev.yaml --data-path 
+      data/processed/validated.csv --model-path artifacts/model/candidate.joblib
+      --output-path artifacts/evaluation/metrics.json
+    deps:
+    - path: artifacts/model/candidate.joblib
+      hash: md5
+      md5: 25fcd9771f7a38d4ae7ecdf88cc9b94a
+      size: 6579
+    - path: configs/dev.yaml
+      hash: md5
+      md5: 8135ecba125e8b5390442320986ad732
+      size: 1152
+    - path: data/processed/validated.csv
+      hash: md5
+      md5: b752c24368e715d38aaf208104edbe16
+      size: 190420
+    - path: src/fraud_scoring/config.py
+      hash: md5
+      md5: 452e98fa1ec1e681fee978c229c20882
+      size: 6600
+    - path: src/fraud_scoring/data_validation.py
+      hash: md5
+      md5: f24de621a845ddf47a52842ee397a67e
+      size: 17303
+    - path: src/fraud_scoring/evaluate.py
+      hash: md5
+      md5: b5b8982b2cbd0d77ff5ee6bf6e875d82
+      size: 5389
+    - path: src/fraud_scoring/features.py
+      hash: md5
+      md5: 26343e01f9f0b022f663f5eebe6c977f
+      size: 11316
+    - path: src/fraud_scoring/train.py
+      hash: md5
+      md5: fe407dac4cd3b7a156c04d8de60725e2
+      size: 3804
+    outs:
+    - path: artifacts/evaluation/metrics.json
+      hash: md5
+      md5: d1f449cc69e4ea5daae8ae111c35a15a
+      size: 352

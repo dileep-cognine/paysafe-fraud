@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,22 +18,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from fraud_scoring.config import AppConfig, load_config
 from fraud_scoring.data_validation import validate_and_enforce
 from fraud_scoring.features import TRAINING_FEATURES, build_training_features
-
-
-@dataclass
-class CandidateArtifact:
-    """Model, input contract, and source fingerprint needed for later evaluation."""
-
-    pipeline: Pipeline
-    dataset_sha256: str
-    feature_names: tuple[str, ...]
-    validation_indices: list[int]
-
-
-def dataset_sha256(path: Path) -> str:
-    """Fingerprint the exact raw dataset bytes used for training."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
+from fraud_scoring.artifacts import CandidateArtifact
+from fraud_scoring.data_utils import dataset_sha256
 
 def split_indices(labels: pd.Series, config: AppConfig) -> tuple[list[int], list[int]]:
     """Return a repeatable stratified holdout using positional row indices."""
@@ -83,25 +68,35 @@ def save_candidate(candidate: CandidateArtifact, path: Path) -> None:
     """Save the complete fitted preprocessing and classifier as one artifact."""
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(candidate, path)
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a local fraud-scoring candidate")
-    parser.add_argument("--config", help="YAML profile; defaults to APP_ENV / CONFIG_PATH")
-    parser.add_argument("--data-path", type=Path, help="Override the configured raw CSV path")
+    parser = argparse.ArgumentParser(
+        description="Train a local fraud-scoring candidate"
+    )
+    parser.add_argument(
+        "--config",
+        help="YAML profile; defaults to APP_ENV / CONFIG_PATH",
+    )
+    parser.add_argument(
+        "--data-path",
+        type=Path,
+        help="Override the configured CSV path",
+    )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        help="Override the candidate artifact path",
+    )
+
     args = parser.parse_args()
+
     config = load_config(args.config)
     data_path = args.data_path or Path(config.data.raw_data_path)
-    # Keep MLflow orchestration outside the estimator implementation.
-    from fraud_scoring.mlflow_tracking import run_training_experiment
+    output_path = args.output_path or Path(config.model.artifact_path)
 
-    outcome = run_training_experiment(data_path, config)
-    print(f"Saved candidate to {config.model.artifact_path}")
-    print(f"Saved evaluation to {config.evaluation.metrics_path}")
-    print(f"MLflow run: {outcome.run_id} (model: {outcome.model_uri})")
-    print(f"Quality gate: {'PASS' if outcome.evaluation.passed else 'FAIL'}")
-    if not outcome.evaluation.passed:
-        raise SystemExit("Quality gate FAILED: " + "; ".join(outcome.evaluation.failed_thresholds))
+    candidate = train_candidate(data_path, config)
+    save_candidate(candidate, output_path)
+
+    print(f"Saved candidate to {output_path}")
 
 
 if __name__ == "__main__":

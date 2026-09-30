@@ -224,10 +224,20 @@ stricter configured thresholds and must be calibrated with real reviewed data.
 Passing this local gate makes a candidate eligible for a separate approval and
 promotion command; training alone does not register, promote, or deploy a model.
 
-### DVC validation stage
+### DVC reproducible pipeline
 
-The current DVC stage reproduces the raw-data validation gate. DVC is installed
-with the development dependencies:
+DVC versions the raw dataset separately from Git and declares the complete
+`prepare → train → evaluate` pipeline in `dvc.yaml`. The preparation stage
+validates and deterministically normalizes the DVC-tracked raw CSV; training
+creates the candidate artifact without starting an MLflow run; evaluation
+creates the measured `metrics.json` and applies the configured quality gate.
+
+Initialize DVC once in the repository:
+
+```bash
+dvc init
+dvc remote add -d local ../paysafe-fraud-dvc-storage
+```
 
 ```bash
 dvc repro

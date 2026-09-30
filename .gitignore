@@ -50,6 +50,7 @@ mlruns_ci.db
 .dvc/cache
 .dvc/tmp
 /data/raw/*.csv
+/data/processed/*.csv
 /data/processed/*.parquet
 /data/processed/*.json
 /models/*

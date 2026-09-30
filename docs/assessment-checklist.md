@@ -7,7 +7,7 @@
 | Schema and data-quality checks | `data_validation.py` with Pandera and explicit checks | `python -m fraud_scoring.data_validation --mode train` |
 | Leakage prevention | fixed feature lists, denylist, and tests | `pytest tests/test_data_validation.py` |
 | Shared train/serve feature builder | `features.py` used by training and prediction | `pytest tests/test_train_serve_consistency.py` |
-| DVC stage | `dvc.yaml` validates the raw data | `dvc repro` after DVC is installed |
+| DVC reproducible pipeline | `dvc.yaml` declares `prepare → train → evaluate`; raw data is DVC-tracked | `dvc repro`, `dvc dag`, `dvc status`, `dvc push` |
 | Training and evaluation gates | `train.py`, `evaluate.py`, configured thresholds | `python -m fraud_scoring.train --config configs/dev.yaml` |
 | MLflow tracking | run parameters, metrics, data input, artifact, signature, example | `pytest tests/test_mlflow_tracking.py` |
 | Registry and explicit alias promotion | `model_registry.py`; no automatic promotion | `pytest tests/test_model_registry.py` |
