@@ -9,14 +9,17 @@ from pathlib import Path
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+import yaml
 from mlflow.data.pandas_dataset import from_pandas
 from mlflow.models import infer_signature
 
+from fraud_scoring.artifacts import CandidateArtifact
 from fraud_scoring.config import AppConfig
+from fraud_scoring.data_utils import dataset_sha256
 from fraud_scoring.data_validation import validate_and_enforce
 from fraud_scoring.evaluate import EvaluationResult, evaluate_candidate, save_evaluation
 from fraud_scoring.features import TARGET_COLUMN, build_serving_features
-from fraud_scoring.train import CandidateArtifact, dataset_sha256, save_candidate, train_candidate
+from fraud_scoring.train import save_candidate, train_candidate
 
 
 @dataclass(frozen=True)
@@ -78,9 +81,45 @@ def _log_results(result: EvaluationResult, raw: pd.DataFrame) -> None:
     if result.failed_thresholds:
         mlflow.set_tag("quality_gate_failures", "; ".join(result.failed_thresholds))
 
+def _dvc_hash(data_path: Path) -> str | None:
+    """Read the real content hash from the DVC pointer beside a tracked dataset."""
+    pointer_path = Path(f"{data_path}.dvc")
 
-def _log_dataset(raw: pd.DataFrame, data_path: Path, candidate: CandidateArtifact) -> None:
+    if not pointer_path.exists():
+        return None
+
+    try:
+        metadata = yaml.safe_load(
+            pointer_path.read_text(encoding="utf-8")
+        ) or {}
+
+        outputs = metadata.get("outs", [])
+
+        if not outputs or not isinstance(outputs[0], dict):
+            return None
+
+        digest = outputs[0].get("md5")
+
+        return (
+            digest
+            if isinstance(digest, str) and digest
+            else None
+        )
+
+    except (
+        OSError,
+        yaml.YAMLError,
+        TypeError,
+        AttributeError,
+    ):
+        return None
+def _log_dataset(
+    raw: pd.DataFrame,
+    data_path: Path,
+    candidate: CandidateArtifact,
+) -> None:
     source = str(data_path.resolve())
+
     mlflow.log_input(
         from_pandas(
             raw,
@@ -90,14 +129,20 @@ def _log_dataset(raw: pd.DataFrame, data_path: Path, candidate: CandidateArtifac
         ),
         context="training",
     )
-    mlflow.set_tags(
-        {
-            "dataset_path": source,
-            "dataset_sha256": candidate.dataset_sha256,
-            "dataset_size_bytes": str(data_path.stat().st_size),
-            "dataset_row_count": str(len(raw)),
-        }
-    )
+
+    tags = {
+        "dataset_path": source,
+        "dataset_sha256": candidate.dataset_sha256,
+        "dataset_size_bytes": str(data_path.stat().st_size),
+        "dataset_row_count": str(len(raw)),
+    }
+
+    dvc_hash = _dvc_hash(data_path)
+
+    if dvc_hash is not None:
+        tags["dataset_dvc_hash"] = dvc_hash
+
+    mlflow.set_tags(tags)
 
 
 def _log_model(candidate: CandidateArtifact, raw: pd.DataFrame) -> str:

@@ -54,6 +54,15 @@ class HealthResponse(BaseModel):
     model_loaded: bool
 
 
+class ModelInfoResponse(BaseModel):
+    """Non-sensitive metadata about the pinned approved model."""
+
+    model_name: str
+    model_alias: str
+    model_version: str
+    environment: str
+
+
 def create_app(config: AppConfig | None = None) -> FastAPI:
     """Create an API whose lifespan loads one pinned approved model version."""
     selected = config or load_config()
@@ -91,6 +100,19 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         if champion is None:
             raise HTTPException(status_code=503, detail="Model unavailable")
         return HealthResponse(status="healthy", model_loaded=True)
+
+    @application.get("/model-info", response_model=ModelInfoResponse)
+    def model_info(request: Request) -> ModelInfoResponse:
+        """Expose only the active alias and pinned model identity to API clients."""
+        champion: LoadedChampion | None = getattr(request.app.state, "champion", None)
+        if champion is None:
+            raise HTTPException(status_code=503, detail="Model unavailable")
+        return ModelInfoResponse(
+            model_name=selected.model.name,
+            model_alias=selected.model.alias,
+            model_version=champion.version,
+            environment=selected.environment,
+        )
 
     @application.post("/score", response_model=ScoreResponse)
     def score(payload: ScoreRequest, request: Request) -> ScoreResponse:
