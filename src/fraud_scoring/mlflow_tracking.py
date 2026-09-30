@@ -5,20 +5,23 @@ from __future__ import annotations
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
-import yaml
+
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+import yaml
 from mlflow.data.pandas_dataset import from_pandas
 from mlflow.models import infer_signature
 
+from fraud_scoring.artifacts import CandidateArtifact
 from fraud_scoring.config import AppConfig
+from fraud_scoring.data_utils import dataset_sha256
 from fraud_scoring.data_validation import validate_and_enforce
 from fraud_scoring.evaluate import EvaluationResult, evaluate_candidate, save_evaluation
 from fraud_scoring.features import TARGET_COLUMN, build_serving_features
 from fraud_scoring.train import save_candidate, train_candidate
-from fraud_scoring.artifacts import CandidateArtifact
-from fraud_scoring.data_utils import dataset_sha256
+
+
 @dataclass(frozen=True)
 class ExperimentOutcome:
     run_id: str

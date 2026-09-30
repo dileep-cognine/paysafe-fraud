@@ -1,5 +1,4 @@
 """Evaluate a local candidate model and apply configured quality thresholds."""
-
 from __future__ import annotations
 
 import argparse
@@ -19,11 +18,12 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from fraud_scoring.artifacts import CandidateArtifact
 from fraud_scoring.config import AppConfig, EvaluationThresholds, load_config
+from fraud_scoring.data_utils import dataset_sha256
 from fraud_scoring.data_validation import validate_and_enforce
 from fraud_scoring.features import TRAINING_FEATURES, build_training_features
-from fraud_scoring.data_utils import dataset_sha256
-from fraud_scoring.artifacts import CandidateArtifact
+
 
 @dataclass(frozen=True)
 class EvaluationResult:

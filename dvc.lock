@@ -32,8 +32,8 @@ stages:
     deps:
     - path: configs/dev.yaml
       hash: md5
-      md5: 8135ecba125e8b5390442320986ad732
-      size: 1152
+      md5: 55ced9554cbafda9cccf7747356533b5
+      size: 1205
     - path: data/processed/validated.csv
       hash: md5
       md5: b752c24368e715d38aaf208104edbe16
@@ -74,8 +74,8 @@ stages:
       size: 6579
     - path: configs/dev.yaml
       hash: md5
-      md5: 8135ecba125e8b5390442320986ad732
-      size: 1152
+      md5: 55ced9554cbafda9cccf7747356533b5
+      size: 1205
     - path: data/processed/validated.csv
       hash: md5
       md5: b752c24368e715d38aaf208104edbe16
@@ -84,6 +84,10 @@ stages:
       hash: md5
       md5: 452e98fa1ec1e681fee978c229c20882
       size: 6600
+    - path: src/fraud_scoring/data_utils.py
+      hash: md5
+      md5: 261927f23b20b5eae12b32fb2b315d23
+      size: 288
     - path: src/fraud_scoring/data_validation.py
       hash: md5
       md5: f24de621a845ddf47a52842ee397a67e

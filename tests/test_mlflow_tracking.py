@@ -46,7 +46,7 @@ def test_run_records_model_data_metrics_and_gate(experiment_setup):
     run = client.get_run(outcome.run_id)
     assert run.info.experiment_id == experiment.experiment_id
     assert run.data.params["model_type"] == "LogisticRegression"
-    assert run.data.params["model.max_iter"] == "1000"
+    assert run.data.params["model.max_iter"] == "1200"
     assert run.data.metrics["roc_auc"] == outcome.evaluation.roc_auc
     assert run.data.metrics["training_row_count"] == 480
     assert run.data.metrics["validation_row_count"] == 120
