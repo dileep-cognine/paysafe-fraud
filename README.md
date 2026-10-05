@@ -107,12 +107,19 @@ paysafe-fraud-scoring/
 
 ## 4. Getting Started
 
-### 4.1 Prerequisites
+### 4.1 Clone the repository
+
+```bash
+git clone https://github.com/dileep-cognine/paysafe-fraud.git
+cd paysafe-fraud
+```
+
+### 4.2 Prerequisites
 - Python 3.10, 3.11, 3.12, or 3.13
 - Git
 - Docker (optional, for container deployment)
 
-### 4.2 Virtual Environment & Installation
+### 4.3 Virtual Environment & Installation
 
 Create and activate a virtual environment:
 ```bash
@@ -128,22 +135,37 @@ source .venv/bin/activate
 Install the dependencies:
 ```bash
 # Runtime package plus development tooling
-pip install -e ".[dev]"
+python -m pip install --constraint requirements.lock -e ".[dev]"
 ```
 
 Install the optional Streamlit client separately when needed:
 
 ```bash
-pip install -e ".[ui]"
+python -m pip install --constraint requirements.lock -e ".[ui]"
 ```
 
-### 4.3 Dependency Management Strategy
+### 4.4 Local configuration
+
+Copy the non-secret local template before overriding any settings:
+
+```bash
+# Windows PowerShell
+Copy-Item .env.example .env
+
+# Linux / macOS
+cp .env.example .env
+```
+
+`.env` is ignored by Git. Keep credentials in your environment or secret store;
+the committed template contains only local defaults and placeholders.
+
+### 4.5 Dependency Management Strategy
 - `pyproject.toml` is the source of truth for direct runtime and development dependencies.
 - `requirements.txt` and `requirements-dev.txt` are compatible direct-dependency lists for plain `pip` and container builds.
 - `requirements.lock` is a pip constraints file containing the resolved environment used by CI and container builds. Refresh it only in a clean virtual environment after intentionally changing dependencies:
 
   ```bash
-  pip install -e ".[dev]"
+  python -m pip install --constraint requirements.lock -e ".[dev]"
   pip freeze --all | Out-File -Encoding ascii requirements.lock  # PowerShell
   # pip freeze --all > requirements.lock                          # Linux/macOS
   ```
@@ -176,7 +198,143 @@ environment or your deployment secret store; never commit a `.env` file.
 
 ---
 
-## 6. Verification & Quality Gates
+## 6. End-to-end local runbook
+
+Run the following from the repository root after completing the setup in
+Section 4. The commands use the current HTTP MLflow configuration and do not
+put the local database, artifacts, or secrets into Git.
+
+### 6.1 Start the MLflow server
+
+Start this in its own terminal and leave it running while you track, promote,
+or serve a model. The server owns the local SQLite backend; application clients
+connect to it over HTTP.
+
+```powershell
+.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5050 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
+```
+
+Open `http://localhost:5050` to inspect experiments, runs, registered models,
+and aliases. If port 5050 is unavailable, choose another free port and set the
+same value for `MLFLOW_TRACKING_URI` in `.env`, the local shell, and Docker.
+
+### 6.2 Restore or generate the synthetic data
+
+The repository is already initialized for DVC. If the configured local remote
+is available, restore the tracked raw data:
+
+```powershell
+dvc pull
+```
+
+If no DVC remote is available for a fresh assessment checkout, generate the
+documented synthetic demonstration data instead:
+
+```powershell
+python -m fraud_scoring.generate_data --output data/raw/transactions.csv --records 5000 --fraud-ratio 0.04 --seed 42
+```
+
+Generating data changes the raw-data dependency, so use it only when the
+tracked dataset is unavailable or when intentionally refreshing the demo data.
+
+### 6.3 Validate data and reproduce the DVC pipeline
+
+Run the data-quality and leakage gate directly:
+
+```powershell
+python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
+```
+
+Then run the reproducible pipeline. It creates the validated dataset, a local
+candidate artifact, and evaluation metrics. It does not create an MLflow run or
+promote a model.
+
+```powershell
+dvc status
+dvc repro
+dvc status
+dvc dag
+```
+
+The equivalent explicit stage commands are useful when debugging one stage:
+
+```powershell
+python -m fraud_scoring.prepare --input-path data/raw/transactions.csv --output-path data/processed/validated.csv
+python -m fraud_scoring.train --config configs/dev.yaml --data-path data/processed/validated.csv --output-path artifacts/model/candidate.joblib
+python -m fraud_scoring.evaluate --config configs/dev.yaml --data-path data/processed/validated.csv --model-path artifacts/model/candidate.joblib --output-path artifacts/evaluation/metrics.json
+```
+
+### 6.4 Track a real experiment and promote only a passing run
+
+Run tracked training after the MLflow server is available. Copy the two values
+printed by the command; they are real values created by that execution.
+
+```powershell
+$env:APP_ENV = "dev"
+$env:MLFLOW_TRACKING_URI = "http://localhost:5050"
+python -m fraud_scoring.mlflow_tracking --config configs/dev.yaml
+```
+
+If the quality gate passes, promote that exact run and logged-model URI. Do not
+replace the placeholders with an invented ID or URI.
+
+```powershell
+python -m fraud_scoring.model_registry promote --config configs/dev.yaml --run-id <RUN_ID_PRINTED_BY_TRACKING> --model-uri <MODEL_URI_PRINTED_BY_TRACKING>
+```
+
+The promotion command exits without moving the alias if the run fails its
+quality gate. Inspect the real run in MLflow before retrying or promoting.
+
+### 6.5 Start and verify the local API
+
+The API requires an approved champion alias in the same MLflow registry. It
+loads the resolved version once at startup.
+
+```powershell
+$env:APP_ENV = "dev"
+$env:MLFLOW_TRACKING_URI = "http://localhost:5050"
+python -m fraud_scoring.api --config configs/dev.yaml
+```
+
+In another terminal:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+Invoke-RestMethod http://localhost:8000/model-info
+$body = @{transaction_id='demo-001'; amount=125.5; merchant_category='grocery'; hour_of_day=14; device_risk=0.2} | ConvertTo-Json
+Invoke-RestMethod http://localhost:8000/score -Method Post -ContentType application/json -Body $body
+```
+
+The request must not include `is_fraud`. Unknown fields and invalid feature
+values are rejected with HTTP 422.
+
+### 6.6 Build and run the Docker API
+
+Keep the MLflow server from Section 6.1 running. Docker Desktop exposes the
+host service through `host.docker.internal`; the image receives that URI at
+runtime and never bundles the registry or model artifact.
+
+```powershell
+docker build -t paysafe-fraud-scoring:v1 .
+docker run --rm -p 8000:8000 -e MLFLOW_TRACKING_URI=http://host.docker.internal:5050 paysafe-fraud-scoring:v1
+```
+
+Use the same verification requests from Section 6.5. To run the local API and
+Docker API together, use `-p 18000:8000` for Docker and substitute port 18000
+in the verification URLs. On native Linux Docker Engine, append
+`--add-host=host.docker.internal:host-gateway` to `docker run`.
+
+### 6.7 Move the runnable local setup to another laptop
+
+Git and DVC do not contain the local MLflow registry or artifacts. To move the
+same approved champion, stop MLflow and all API clients on the source machine,
+then transfer `mlruns.db` and the complete `mlruns/` directory to the root of
+the destination clone. Start the MLflow server in Section 6.1 on the destination
+machine, then use the local or Docker commands above. Keep this state out of
+Git. Alternatively, run the real tracking and gated-promotion workflow there to
+create a new approved version.
+
+## 7. Verification & Quality Gates
 
 Run the test suite:
 ```bash
@@ -195,7 +353,7 @@ Verify configuration loader:
 python -c "from fraud_scoring.config import load_config; cfg = load_config(); print(f'Loaded {cfg.environment} environment configuration successfully')"
 ```
 
-## 7. Local candidate training and evaluation
+## 8. Local candidate training and evaluation
 
 Stage 4 uses a logistic-regression baseline because its probability scores and fitted
 preprocessing are easy to inspect. The shared feature builder first enforces the
@@ -232,18 +390,24 @@ validates and deterministically normalizes the DVC-tracked raw CSV; training
 creates the candidate artifact without starting an MLflow run; evaluation
 creates the measured `metrics.json` and applies the configured quality gate.
 
-Initialize DVC once in the repository:
+The repository is already initialized for DVC. Its committed configuration uses
+the local remote `../paysafe-fraud-dvc-storage`; do not run `dvc init` again in
+a clone. Restore data when that remote is available, then inspect and reproduce
+the pipeline:
 
 ```bash
-dvc init
-dvc remote add -d local ../paysafe-fraud-dvc-storage
-```
-
-```bash
+dvc pull
+dvc status
 dvc repro
 ```
 
-## 8. MLflow experiment tracking
+To move from the assessment's local remote to object storage later, configure
+an approved remote outside this repository, for example
+`dvc remote add -d production s3://<bucket>/<prefix>` or
+`dvc remote add -d production gs://<bucket>/<prefix>`, authenticate through the
+deployment environment, then run `dvc push`. S3/GCS is not currently configured.
+
+## 9. MLflow experiment tracking
 
 `python -m fraud_scoring.train --config configs/dev.yaml` trains and saves a
 local candidate for the reproducible DVC pipeline. To run that same real
@@ -260,16 +424,19 @@ a model.
 
 The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
-the current `.env.example`, local runs use `sqlite:///mlruns.db` and the
-`fraud-scoring-dev` experiment. If no override is set, `configs/dev.yaml` uses
-`paysafe-fraud-scoring-dev` instead. Start the local UI from the repository root:
+the current `.env.example`, local runs use `http://localhost:5050` and the
+`fraud-scoring-dev` experiment. Without an experiment-name override,
+`configs/dev.yaml` uses `paysafe-fraud-scoring-dev`. Start the tracking server
+from the repository root before running tracking, promotion, or inference:
 
-```bash
-python -m mlflow ui --backend-store-uri sqlite:///mlruns.db --host 127.0.0.1 --port 5000
+```powershell
+.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5050 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
 ```
 
-Then open `http://127.0.0.1:5000`. If you override the tracking URI, pass that
-same URI to `--backend-store-uri` so the UI reads the same store.
+Open `http://localhost:5050` for the UI. SQLite is the server's backend;
+application clients use HTTP. Do not pass the HTTP tracking URL as the server's
+`--backend-store-uri`. The server proxies `mlflow-artifacts:/` references to
+files under `./mlruns`.
 
 Each run records model type and hyperparameters, seed, split fraction, feature
 names, and preprocessing; the measured evaluation metrics and class/row counts;
@@ -288,7 +455,7 @@ actual commit hash. The SHA-256 tag fingerprints the raw bytes; it is not a
 fabricated DVC version. MLflow may display the candidate under its logged-model
 section; that alone does not create a registered production model or alias.
 
-## 9. Explicit model promotion and rollback
+## 10. Explicit model promotion and rollback
 
 Training creates a **candidate**: a fitted model under evaluation. An MLflow
 **run** holds the actual metrics and gate result. A **registered model** is the
@@ -322,7 +489,7 @@ checked again against the selected profile's current thresholds. The alias
 moves back to the existing version without deleting the newer version. See
 `docs/branch-protection.md` for proposed approval roles and ownership.
 
-## 10. Local FastAPI scoring service
+## 11. Local FastAPI scoring service
 
 Start the service from the repository root after promoting a passing candidate:
 
@@ -355,6 +522,11 @@ probability for fraud class 1. No training label is returned.
 curl -X POST "http://127.0.0.1:8000/score" \
   -H "Content-Type: application/json" \
   -d '{"transaction_id":"txn-1001","amount":125.50,"merchant_category":"electronics","hour_of_day":14,"device_risk":0.23}'
+```
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/model-info
 ```
 
 The response has numeric `risk_score` (0â€“1) and string `model_version` fields.
@@ -395,14 +567,11 @@ timeouts, missing credentials, provider errors, and categories outside the
 approved list all take the safe unknown path and never reach the model. Install
 Ollama locally and pull the selected model before enabling it.
 
-In one local verification on 2026-09-25, the approved synthetic-data model
-returned `{"risk_score":0.31914670174006454,"model_version":"2"}` for the
-request above. Ten sequential local HTTP requests had a 16.95 ms median and
-185.87 ms maximum observed latency (also the nearest-rank p95 for 10 samples).
-These are local measurements, not a production latency guarantee. The value
-and version will change when the approved alias points to a different model.
+Run the commands above against your own approved alias and record the returned
+model version and score as release evidence. Scores, latency, and model versions
+are not fixed documentation values; they depend on the approved model and runtime.
 
-## 11. Production-style Docker image
+## 12. Production-style Docker image
 
 Build the Stage 8 image with `docker build --tag paysafe-fraud-scoring:latest .`.
 It uses a pinned Python 3.13.13 slim Bookworm image, multi-stage wheel build,
@@ -414,11 +583,17 @@ The image starts the same FastAPI factory without reload and reads its runtime
 configuration from environment variables. Supply a reachable MLflow registry
 URI and the configured model name and alias when running it. The image resolves
 the approved alias at startup; it cannot use the host's local SQLite tracking
-store as a production registry. The local image was built at 470.1 MB and
-verified to run as non-root `appuser`. See [container instructions](docs/containers.md)
-for the build, run, health, non-root, image-size, and scan commands.
+store as a production registry. See [container instructions](docs/containers.md)
+for the build, run, health, non-root, image-size, and scan commands. Record
+actual image size and runtime evidence in the release review rather than
+treating documentation examples as evidence.
 
-## 12. Development workflow and CI
+Use the complete commands in the [end-to-end local runbook](#6-end-to-end-local-runbook).
+The Docker image connects to the host MLflow server at runtime; it never embeds
+the database or model artifacts. See [container instructions](docs/containers.md)
+for image security and release checks.
+
+## 13. Development workflow and CI
 
 Use short-lived branches and pull requests for every change:
 
@@ -449,7 +624,7 @@ the image. Model promotion remains separate: `training → evaluation → qualit
 gate → explicit authorized promotion`. See [branch-protection guidance](docs/branch-protection.md)
 for the GitHub settings a repository maintainer should configure manually.
 
-## 13. Optional Streamlit client
+## 14. Optional Streamlit client
 
 The UI is a client of FastAPI only: it does not load MLflow models, perform
 feature engineering, train, or promote models. Start a healthy API first, then:
@@ -464,7 +639,7 @@ It calls `GET /health`, `GET /model-info`, and `POST /score`. Set
 shows returned score and version exactly as supplied by the API. Its low/medium/
 high display labels are visual guidance only, not fraud-policy thresholds.
 
-## 14. Assessment walkthrough
+## 15. Assessment walkthrough
 
 1. Show `data/README.md`, `data_validation.py`, and its validation command.
 2. Show `features.py` and the train/serve consistency test.

@@ -74,7 +74,7 @@ class EvaluationConfig(StrictConfigModel):
 
 
 class MLflowConfig(StrictConfigModel):
-    tracking_uri: str = "sqlite:///mlruns.db"
+    tracking_uri: str = "http://localhost:5050"
     experiment_name: str = "paysafe-fraud-scoring"
 
 
@@ -161,8 +161,9 @@ def load_config(config_path: Optional[str | Path] = None, force_reload: bool = F
     # Environment variables carry deployment-specific values and secrets.
     # YAML remains the committed, non-secret configuration baseline.
     for env_var, (section, key) in ENVIRONMENT_OVERRIDES.items():
-        if env_var in os.environ:
-            raw_yaml.setdefault(section, {})[key] = os.environ[env_var]
+        value = os.getenv(env_var)
+        if value is not None and value.strip():
+            raw_yaml.setdefault(section, {})[key] = value
     # APP_ENV selects the default file when no explicit configuration was requested.
     # An explicitly supplied config file is authoritative, which keeps validation
     # and tests for other environments independent of the process environment.

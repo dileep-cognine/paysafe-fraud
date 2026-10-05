@@ -23,7 +23,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     API_HOST=0.0.0.0 \
     API_PORT=8000 \
     API_WORKERS=1 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=info
 
 RUN groupadd --system --gid 10001 appuser \
     && useradd --system --uid 10001 --gid appuser --home-dir /app --create-home appuser
@@ -44,4 +44,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 # Do not use reload in the container. Environment variables supply host, port,
 # worker count, log level, and MLflow connection details at runtime.
-CMD ["sh", "-c", "exec uvicorn fraud_scoring.api:create_app_from_environment --factory --host \"${API_HOST:-0.0.0.0}\" --port \"${API_PORT:-8000}\" --workers \"${API_WORKERS:-1}\" --log-level \"${LOG_LEVEL:-info}\""]
+CMD ["sh", "-c", ": \"${MLFLOW_TRACKING_URI:?Set MLFLOW_TRACKING_URI to your reachable MLflow server}\"; exec uvicorn fraud_scoring.api:create_app_from_environment --factory --host \"${API_HOST:-0.0.0.0}\" --port \"${API_PORT:-8000}\" --workers \"${API_WORKERS:-1}\" --log-level \"${LOG_LEVEL:-info}\""]

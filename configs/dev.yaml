@@ -42,7 +42,7 @@ evaluation:
   metrics_path: "artifacts/evaluation/metrics.json"
 
 mlflow:
-  tracking_uri: "sqlite:///mlruns.db"
+  tracking_uri: "http://localhost:5050"
   experiment_name: "paysafe-fraud-scoring-dev"
 
 server:
