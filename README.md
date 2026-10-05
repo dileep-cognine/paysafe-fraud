@@ -6,13 +6,17 @@
 [![DVC](https://img.shields.io/badge/data-DVC-945DD6.svg)](https://dvc.org/)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 
-An incremental MLOps assessment project for transaction fraud scoring. The current implementation covers synthetic data validation, shared train/serve features, candidate training, evaluation gates, MLflow experiment tracking, explicit gated registry promotion, and a local FastAPI scoring service. Container deployment is planned for a later stage.
+An assessment-ready MLOps system for transaction fraud scoring. It validates
+synthetic historical transactions, prevents leakage, trains and evaluates a
+candidate, tracks it in MLflow, promotes only approved versions, serves the
+configured champion through FastAPI, packages the service in Docker, and offers
+an optional Streamlit HTTP client.
 
 ---
 
 ## 1. System Architecture & Flow
 
-The planned lifecycle is shown below; this repository currently implements through the FastAPI scoring service:
+The implemented lifecycle is:
 
 ```text
 Raw Data (CSV)
@@ -23,9 +27,9 @@ Leakage Checks (Assert target is absent from serve schemas)
    â†“
 Shared Feature Builder (Exact same transform pipeline for Train & Serve)
    â†“
-DVC Pipeline (Reproducible stages: prepare â†’ train â†’ evaluate)
+DVC validation stage (reproducible raw-data gate)
    â†“
-Model Training (HistGradientBoosting / scikit-learn)
+Model Training (logistic regression / scikit-learn)
    â†“
 Evaluation & Quality Gate (ROC-AUC, PR-AUC, Precision@Recall80)
    â†“
@@ -127,6 +131,12 @@ Install the dependencies:
 pip install -e ".[dev]"
 ```
 
+Install the optional Streamlit client separately when needed:
+
+```bash
+pip install -e ".[ui]"
+```
+
 ### 4.3 Dependency Management Strategy
 - `pyproject.toml` is the source of truth for direct runtime and development dependencies.
 - `requirements.txt` and `requirements-dev.txt` are compatible direct-dependency lists for plain `pip` and container builds.
@@ -214,14 +224,39 @@ stricter configured thresholds and must be calibrated with real reviewed data.
 Passing this local gate makes a candidate eligible for a separate approval and
 promotion command; training alone does not register, promote, or deploy a model.
 
+### DVC reproducible pipeline
+
+DVC versions the raw dataset separately from Git and declares the complete
+`prepare → train → evaluate` pipeline in `dvc.yaml`. The preparation stage
+validates and deterministically normalizes the DVC-tracked raw CSV; training
+creates the candidate artifact without starting an MLflow run; evaluation
+creates the measured `metrics.json` and applies the configured quality gate.
+
+Initialize DVC once in the repository:
+
+```bash
+dvc init
+dvc remote add -d local ../paysafe-fraud-dvc-storage
+```
+
+```bash
+dvc repro
+```
+
 ## 8. MLflow experiment tracking
 
-`python -m fraud_scoring.train --config configs/dev.yaml` now trains, evaluates,
-applies the existing quality gate, and records the complete candidate experiment
-in MLflow. The standalone evaluation command remains available to recheck a
-saved candidate. The run is recorded even when the gate fails; in that case the
-training command exits nonzero after logging. Training itself never registers or
-promotes a model.
+`python -m fraud_scoring.train --config configs/dev.yaml` trains and saves a
+local candidate for the reproducible DVC pipeline. To run that same real
+training and evaluation lifecycle while recording an MLflow experiment, use:
+
+```bash
+python -m fraud_scoring.mlflow_tracking --config configs/dev.yaml
+```
+
+The tracking command records a run even when the gate fails, then exits nonzero.
+It logs the feature contract, measured metrics, confusion matrix, dataset
+reference, signature, and input example. Neither command registers or promotes
+a model.
 
 The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
@@ -327,6 +362,10 @@ Invalid requests return 422; an unavailable model returns 503; unexpected
 prediction failures return a generic 500 while details stay in server logs.
 Logs record the model version and request duration without transaction values.
 
+`GET /health` reports whether the champion loaded. `GET /model-info` returns the
+non-secret active model name, alias, pinned version, and environment. `/docs`
+provides the generated OpenAPI interface.
+
 ### Merchant category normalization
 
 `merchant_category` is normalized in the shared feature contract before the
@@ -409,4 +448,31 @@ credentials. It builds an image for validation only; it does not push or deploy
 the image. Model promotion remains separate: `training → evaluation → quality
 gate → explicit authorized promotion`. See [branch-protection guidance](docs/branch-protection.md)
 for the GitHub settings a repository maintainer should configure manually.
+
+## 13. Optional Streamlit client
+
+The UI is a client of FastAPI only: it does not load MLflow models, perform
+feature engineering, train, or promote models. Start a healthy API first, then:
+
+```bash
+pip install -e ".[ui]"
+streamlit run ui/app.py
+```
+
+It calls `GET /health`, `GET /model-info`, and `POST /score`. Set
+`FRAUD_SCORING_API_URL` when the API is not at `http://127.0.0.1:8000`. The UI
+shows returned score and version exactly as supplied by the API. Its low/medium/
+high display labels are visual guidance only, not fraud-policy thresholds.
+
+## 14. Assessment walkthrough
+
+1. Show `data/README.md`, `data_validation.py`, and its validation command.
+2. Show `features.py` and the train/serve consistency test.
+3. Run training, inspect the generated evaluation metrics, and explain the gate.
+4. Open MLflow to inspect the actual run, artifacts, and model signature.
+5. Promote only an eligible model with the explicit registry command.
+6. Start FastAPI and call `/health`, `/model-info`, and `/score`.
+7. Show the optional Streamlit client calling the API.
+8. Build the Docker image and explain its non-root runtime and external MLflow requirement.
+9. Show CI, branch-protection guidance, `docs/lineage.md`, and the assessment checklist.
 

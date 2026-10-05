@@ -28,6 +28,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ui = [
+    "streamlit>=1.32.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -48,7 +51,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-v --strict-markers --basetemp=.pytest_temp -o asyncio_default_fixture_loop_scope=function"
+addopts = "-v --strict-markers"
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::FutureWarning:pandera.*",

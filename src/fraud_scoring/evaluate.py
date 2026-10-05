@@ -1,5 +1,4 @@
 """Evaluate a local candidate model and apply configured quality thresholds."""
-
 from __future__ import annotations
 
 import argparse
@@ -19,10 +18,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from fraud_scoring.artifacts import CandidateArtifact
 from fraud_scoring.config import AppConfig, EvaluationThresholds, load_config
+from fraud_scoring.data_utils import dataset_sha256
 from fraud_scoring.data_validation import validate_and_enforce
 from fraud_scoring.features import TRAINING_FEATURES, build_training_features
-from fraud_scoring.train import CandidateArtifact, dataset_sha256
 
 
 @dataclass(frozen=True)
@@ -106,24 +106,26 @@ def save_evaluation(result: EvaluationResult, path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate a local fraud-scoring candidate")
-    parser.add_argument("--config", help="YAML profile; defaults to APP_ENV / CONFIG_PATH")
-    parser.add_argument("--data-path", type=Path, help="Override the configured raw CSV path")
-    parser.add_argument("--model-path", type=Path, help="Override the configured candidate path")
+    parser.add_argument("--config",help="YAML profile; defaults to APP_ENV / CONFIG_PATH",)
+    parser.add_argument("--data-path",type=Path,help="Override the configured CSV path",)
+    parser.add_argument("--model-path",type=Path,help="Override the configured candidate path",)
+    parser.add_argument("--output-path",type=Path,help="Override the evaluation metrics path",)
     args = parser.parse_args()
     config = load_config(args.config)
     data_path = args.data_path or Path(config.data.raw_data_path)
     model_path = args.model_path or Path(config.model.artifact_path)
     candidate = joblib.load(model_path)
     if not isinstance(candidate, CandidateArtifact):
-        raise TypeError(f"Artifact at {model_path} is not a fraud-scoring candidate.")
-    result = evaluate_candidate(candidate, data_path, config)
-    output = Path(config.evaluation.metrics_path)
+        raise TypeError(
+            f"Artifact at {model_path} is not a fraud-scoring candidate."
+        )
+    result = evaluate_candidate(candidate,data_path,config,)
+    output = args.output_path or Path(config.evaluation.metrics_path)
     save_evaluation(result, output)
     print(json.dumps(asdict(result), indent=2))
     print(f"Saved evaluation to {output}")
     if not result.passed:
         raise SystemExit("Quality gate FAILED: " + "; ".join(result.failed_thresholds))
-
 
 if __name__ == "__main__":
     main()

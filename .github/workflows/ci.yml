@@ -58,12 +58,23 @@ jobs:
       - name: Run raw-data quality and leakage gate
         run: python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
 
+      - name: Reproduce DVC training and evaluation pipeline
+        run: python -m dvc repro
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: reports/junit.xml
+          if-no-files-found: warn
+
+      - name: Upload evaluation metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-metrics
+          path: artifacts/evaluation/metrics.json
           if-no-files-found: warn
 
   docker-build:

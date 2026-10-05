@@ -26,6 +26,9 @@ long-lived development branch. Open a pull request to `main`; the `CI` workflow
 runs formatting, linting, type checks, the complete test suite, raw-data
 validation, a Docker build, and secret hygiene checks.
 
+Use Conventional Commits for change history, for example
+`feat(tracking): log evaluation artifacts` or `fix(ci): publish evaluation metrics`.
+
 Configure GitHub branch protection for `main` manually in **Settings → Branches**:
 
 1. Require a pull request before merging.

@@ -43,6 +43,7 @@ reports/
 # MLflow Tracking & Artifacts
 mlruns/
 mlruns.db
+mlflow.db
 mlruns_ci.db
 .trash/
 
@@ -50,6 +51,7 @@ mlruns_ci.db
 .dvc/cache
 .dvc/tmp
 /data/raw/*.csv
+/data/processed/*.csv
 /data/processed/*.parquet
 /data/processed/*.json
 /models/*

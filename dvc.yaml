@@ -1,6 +1,38 @@
 stages:
-  validate_data:
-    cmd: python -m fraud_scoring.data_validation --data-path data/raw/transactions.csv --mode train
+  prepare:
+    cmd: python -m fraud_scoring.prepare --input-path data/raw/transactions.csv --output-path data/processed/validated.csv
     deps:
       - data/raw/transactions.csv
+      - src/fraud_scoring/prepare.py
       - src/fraud_scoring/data_validation.py
+      - src/fraud_scoring/features.py
+    outs:
+      - data/processed/validated.csv
+
+  train:
+    cmd: python -m fraud_scoring.train --config configs/dev.yaml --data-path data/processed/validated.csv --output-path artifacts/model/candidate.joblib
+    deps:
+      - data/processed/validated.csv
+      - src/fraud_scoring/train.py
+      - src/fraud_scoring/data_validation.py
+      - src/fraud_scoring/data_utils.py
+      - src/fraud_scoring/features.py
+      - src/fraud_scoring/config.py
+      - configs/dev.yaml
+    outs:
+      - artifacts/model/candidate.joblib
+
+  evaluate:
+    cmd: python -m fraud_scoring.evaluate --config configs/dev.yaml --data-path data/processed/validated.csv --model-path artifacts/model/candidate.joblib --output-path artifacts/evaluation/metrics.json
+    deps:
+      - data/processed/validated.csv
+      - artifacts/model/candidate.joblib
+      - src/fraud_scoring/evaluate.py
+      - src/fraud_scoring/train.py
+      - src/fraud_scoring/data_validation.py
+      - src/fraud_scoring/features.py
+      - src/fraud_scoring/data_utils.py
+      - src/fraud_scoring/config.py
+      - configs/dev.yaml
+    metrics:
+      - artifacts/evaluation/metrics.json
