@@ -9,5 +9,5 @@ from sklearn.pipeline import Pipeline
 class CandidateArtifact:
     pipeline: Pipeline
     dataset_sha256: str
-    feature_names: list[str]
+    feature_names: tuple[str, ...]
     validation_indices: list[int]

@@ -25,9 +25,7 @@ def prepare_dataset(input_path: Path, output_path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Prepare validated fraud-scoring training data"
-    )
+    parser = argparse.ArgumentParser(description="Prepare validated fraud-scoring training data")
 
     parser.add_argument(
         "--input-path",

@@ -15,12 +15,14 @@ ROC-AUC, PR-AUC, and precision at 80% recall against configuration thresholds.
 
 ## Training and promotion
 
-Training records the candidate, evaluated metrics, data reference, model
-signature, and input example in MLflow. A passing evaluation makes a candidate
-eligible; it does not deploy it. An authorized owner explicitly promotes the
-logged MLflow model only after the promotion code rechecks the gate and current
-thresholds. The configured `champion` alias then identifies the approved
-registered version.
+The DVC `train` stage writes a local candidate and the `evaluate` stage applies
+the configured quality gate. The explicit MLflow tracking command runs the same
+real lifecycle and records its candidate, metrics, data reference, feature
+contract, confusion matrix, model signature, and input example. A passing
+evaluation makes a candidate eligible; it does not deploy it. An authorized
+owner explicitly promotes the logged MLflow model only after the promotion code
+rechecks the gate and current thresholds. The configured `champion` alias then
+identifies the approved registered version.
 
 ## Serving
 
@@ -37,6 +39,16 @@ variables override deployment-specific values; `.env` is ignored and is not
 copied into the Docker image. The image uses a pinned Python base, multi-stage
 build, `.dockerignore`, and a non-root runtime user. CI has no deployment or
 registry credentials and does not promote models.
+
+## Repository responsibilities and completion criteria
+
+Git stores source code, configuration profiles, tests, DVC metadata, and
+documentation. DVC stores the raw dataset reference and reproduces derived
+data, local candidates, and metrics. MLflow stores experiment and registry
+metadata; it is not a substitute for DVC data versioning. A change is ready for
+review when formatting, linting, typing, tests, the raw-data gate, the DVC
+pipeline, and Docker build checks pass in CI. Promotion is a separate reviewed
+operation and requires a real passing MLflow run.
 
 ## Trade-off
 

@@ -245,12 +245,18 @@ dvc repro
 
 ## 8. MLflow experiment tracking
 
-`python -m fraud_scoring.train --config configs/dev.yaml` now trains, evaluates,
-applies the existing quality gate, and records the complete candidate experiment
-in MLflow. The standalone evaluation command remains available to recheck a
-saved candidate. The run is recorded even when the gate fails; in that case the
-training command exits nonzero after logging. Training itself never registers or
-promotes a model.
+`python -m fraud_scoring.train --config configs/dev.yaml` trains and saves a
+local candidate for the reproducible DVC pipeline. To run that same real
+training and evaluation lifecycle while recording an MLflow experiment, use:
+
+```bash
+python -m fraud_scoring.mlflow_tracking --config configs/dev.yaml
+```
+
+The tracking command records a run even when the gate fails, then exits nonzero.
+It logs the feature contract, measured metrics, confusion matrix, dataset
+reference, signature, and input example. Neither command registers or promotes
+a model.
 
 The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With

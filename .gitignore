@@ -43,6 +43,7 @@ reports/
 # MLflow Tracking & Artifacts
 mlruns/
 mlruns.db
+mlflow.db
 mlruns_ci.db
 .trash/
 
