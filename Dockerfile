@@ -16,6 +16,10 @@ RUN python -m pip wheel --constraint requirements.lock --wheel-dir /wheels .
 
 FROM ${PYTHON_IMAGE} AS runtime
 
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

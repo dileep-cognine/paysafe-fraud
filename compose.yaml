@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: .
+    image: paysafe-fraud-scoring:local
+    ports:
+      - "${COMPOSE_API_PORT:-8000}:8000"
+    environment:
+      APP_ENV: prod
+      MLFLOW_TRACKING_URI: ${COMPOSE_MLFLOW_TRACKING_URI:-http://host.docker.internal:5000}
+      MLFLOW_EXPERIMENT_NAME: ${COMPOSE_MLFLOW_EXPERIMENT_NAME:-paysafe-fraud-scoring-prod}
+      MODEL_REGISTRY_NAME: ${COMPOSE_MODEL_REGISTRY_NAME:-paysafe-fraud-detector}
+      MODEL_ALIAS: ${COMPOSE_MODEL_ALIAS:-champion}
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_WORKERS: 1
+      LOG_LEVEL: ${COMPOSE_LOG_LEVEL:-INFO}
+    # Required by native Linux Docker Engine; harmless with Docker Desktop.
+    extra_hosts:
+      - host.docker.internal:host-gateway

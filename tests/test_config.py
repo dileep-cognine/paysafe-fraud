@@ -88,7 +88,7 @@ def test_blank_environment_override_keeps_profile_value(monkeypatch):
 
     config = load_config("configs/dev.yaml", force_reload=True)
 
-    assert config.mlflow.tracking_uri == "http://localhost:5050"
+    assert config.mlflow.tracking_uri == "http://localhost:5000"
 
 
 def test_llm_category_mapping_environment_overrides(monkeypatch):

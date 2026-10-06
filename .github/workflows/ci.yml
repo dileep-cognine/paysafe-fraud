@@ -79,17 +79,59 @@ jobs:
           if-no-files-found: warn
 
   docker-build:
-    name: Build Docker image
+    name: Build Docker image, scan it, and generate SBOM
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      IMAGE_TAG: paysafe-fraud-scoring:${{ github.sha }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
       - name: Build image without pushing it
-        run: docker build --tag "paysafe-fraud-scoring:${{ github.sha }}" .
+        run: docker build --tag "$IMAGE_TAG" .
+
+      - name: Prepare image-scan output directory
+        run: mkdir -p artifacts/security
+
+      - name: Scan final image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: json
+          output: artifacts/security/trivy-image.json
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Upload Trivy image scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-scan-${{ github.sha }}
+          path: artifacts/security/trivy-image.json
+          if-no-files-found: warn
+
+      - name: Install Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Generate SPDX SBOM from final image
+        run: |
+          mkdir -p sbom
+          ${{ steps.syft.outputs.cmd }} "$IMAGE_TAG" -o "spdx-json=sbom/paysafe-fraud-scoring.spdx.json"
+
+      - name: Verify SPDX SBOM content
+        run: |
+          python -c "import json; sbom = json.load(open('sbom/paysafe-fraud-scoring.spdx.json', encoding='utf-8')); packages = sbom.get('packages', []); assert packages, 'SBOM contains no packages'; print(f'SPDX packages: {len(packages)}')"
+
+      - name: Upload image SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-sbom-spdx-${{ github.sha }}
+          path: sbom/paysafe-fraud-scoring.spdx.json
+          if-no-files-found: error
 
   secret-hygiene:
     name: Verify secret hygiene

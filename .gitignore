@@ -56,6 +56,8 @@ mlruns_ci.db
 /data/processed/*.json
 /models/*
 /artifacts/
+# Generated from a final Docker image and uploaded by CI; not source code.
+/sbom/
 !/data/raw/.gitkeep
 !/data/processed/.gitkeep
 !/data/README.md

@@ -74,7 +74,7 @@ class EvaluationConfig(StrictConfigModel):
 
 
 class MLflowConfig(StrictConfigModel):
-    tracking_uri: str = "http://localhost:5050"
+    tracking_uri: str = "http://localhost:5000"
     experiment_name: str = "paysafe-fraud-scoring"
 
 

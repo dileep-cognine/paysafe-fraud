@@ -211,11 +211,11 @@ or serve a model. The server owns the local SQLite backend; application clients
 connect to it over HTTP.
 
 ```powershell
-.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5050 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
+.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5000 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
 ```
 
-Open `http://localhost:5050` to inspect experiments, runs, registered models,
-and aliases. If port 5050 is unavailable, choose another free port and set the
+Open `http://localhost:5000` to inspect experiments, runs, registered models,
+and aliases. If port 5000 is unavailable, choose another free port and set the
 same value for `MLFLOW_TRACKING_URI` in `.env`, the local shell, and Docker.
 
 ### 6.2 Restore or generate the synthetic data
@@ -271,7 +271,7 @@ printed by the command; they are real values created by that execution.
 
 ```powershell
 $env:APP_ENV = "dev"
-$env:MLFLOW_TRACKING_URI = "http://localhost:5050"
+$env:MLFLOW_TRACKING_URI = "http://localhost:5000"
 python -m fraud_scoring.mlflow_tracking --config configs/dev.yaml
 ```
 
@@ -292,7 +292,7 @@ loads the resolved version once at startup.
 
 ```powershell
 $env:APP_ENV = "dev"
-$env:MLFLOW_TRACKING_URI = "http://localhost:5050"
+$env:MLFLOW_TRACKING_URI = "http://localhost:5000"
 python -m fraud_scoring.api --config configs/dev.yaml
 ```
 
@@ -316,8 +316,19 @@ runtime and never bundles the registry or model artifact.
 
 ```powershell
 docker build -t paysafe-fraud-scoring:v1 .
-docker run --rm -p 8000:8000 -e MLFLOW_TRACKING_URI=http://host.docker.internal:5050 paysafe-fraud-scoring:v1
+docker run --rm -p 8000:8000 -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 paysafe-fraud-scoring:v1
 ```
+
+The same API deployment can be started with Compose after the MLflow server is
+running:
+
+```powershell
+docker compose up --build
+```
+
+Compose defaults to `http://host.docker.internal:5000` for the external MLflow
+server. See [container instructions](docs/containers.md#docker-compose) for
+environment overrides and shutdown commands.
 
 Use the same verification requests from Section 6.5. To run the local API and
 Docker API together, use `-p 18000:8000` for Docker and substitute port 18000
@@ -424,16 +435,16 @@ a model.
 
 The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
-the current `.env.example`, local runs use `http://localhost:5050` and the
+the current `.env.example`, local runs use `http://localhost:5000` and the
 `fraud-scoring-dev` experiment. Without an experiment-name override,
 `configs/dev.yaml` uses `paysafe-fraud-scoring-dev`. Start the tracking server
 from the repository root before running tracking, promotion, or inference:
 
 ```powershell
-.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5050 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
+.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5000 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
 ```
 
-Open `http://localhost:5050` for the UI. SQLite is the server's backend;
+Open `http://localhost:5000` for the UI. SQLite is the server's backend;
 application clients use HTTP. Do not pass the HTTP tracking URL as the server's
 `--backend-store-uri`. The server proxies `mlflow-artifacts:/` references to
 files under `./mlruns`.
@@ -587,6 +598,14 @@ store as a production registry. See [container instructions](docs/containers.md)
 for the build, run, health, non-root, image-size, and scan commands. Record
 actual image size and runtime evidence in the release review rather than
 treating documentation examples as evidence.
+
+CI generates an SPDX JSON SBOM from its exact final image and uploads it as a
+workflow artifact. Local SBOM commands and Syft installation guidance are in
+[container instructions](docs/containers.md#sbom-generation).
+
+CI also scans that same final image with Trivy. HIGH and CRITICAL findings fail
+the Docker job, and its JSON result is retained as a workflow artifact. See the
+[container vulnerability-scanning commands](docs/containers.md#image-vulnerability-scanning).
 
 Use the complete commands in the [end-to-end local runbook](#6-end-to-end-local-runbook).
 The Docker image connects to the host MLflow server at runtime; it never embeds
