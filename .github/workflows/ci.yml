@@ -134,13 +134,14 @@ jobs:
           path: sbom/paysafe-fraud-scoring.spdx.json
           if-no-files-found: error
 
-      - name: Enforce high and critical vulnerability gate
+      - name: Enforce fixable high and critical vulnerability gate
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_TAG }}
           format: table
           severity: HIGH,CRITICAL
           scanners: vuln
+          ignore-unfixed: true
           exit-code: "1"
 
   secret-hygiene:

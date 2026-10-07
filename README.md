@@ -603,8 +603,9 @@ CI generates an SPDX JSON SBOM from its exact final image and uploads it as a
 workflow artifact. Local SBOM commands and Syft installation guidance are in
 [container instructions](docs/containers.md#sbom-generation).
 
-CI also scans that same final image with Trivy. HIGH and CRITICAL findings fail
-the Docker job, and its JSON result is retained as a workflow artifact. See the
+CI also scans that same final image with Trivy. Fixable HIGH and CRITICAL
+findings fail the Docker job, while the JSON artifact retains all HIGH and
+CRITICAL findings for review. See the
 [container vulnerability-scanning commands](docs/containers.md#image-vulnerability-scanning).
 
 Use the complete commands in the [end-to-end local runbook](#6-end-to-end-local-runbook).
