@@ -109,11 +109,13 @@ trivy image --severity HIGH,CRITICAL --exit-code 1 paysafe-fraud-scoring:latest
 ```
 
 CI builds `paysafe-fraud-scoring:${{ github.sha }}` and scans that exact final
-image. HIGH and CRITICAL findings make the Docker job fail. The JSON result is
-uploaded as the `trivy-image-scan-<sha>` GitHub Actions artifact, including
-when the scan step fails. The local `artifacts/security/` result is ignored by
-Git; retain real scan output with deployment or release evidence rather than
-claiming a clean scan without running it.
+image. Its JSON artifact retains every HIGH and CRITICAL finding as
+`trivy-image-scan-<sha>`. The enforcement step blocks HIGH and CRITICAL
+vulnerabilities with an upstream fixed version. Findings without a published
+fix remain visible in the report for review and must be reassessed whenever the
+pinned base-image digest changes. The local `artifacts/security/` result is
+ignored by Git; retain real scan output with deployment or release evidence
+rather than claiming a clean scan without running it.
 
 Image scanning and SBOM generation have different responsibilities: Trivy
 reports known vulnerabilities, while Syft inventories image components.
