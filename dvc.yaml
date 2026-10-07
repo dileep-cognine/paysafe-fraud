@@ -10,7 +10,7 @@ stages:
       - data/processed/validated.csv
 
   train:
-    cmd: python -m fraud_scoring.train --config configs/dev.yaml --data-path data/processed/validated.csv --output-path artifacts/model/candidate.joblib
+    cmd: python -m fraud_scoring.train --data-path data/processed/validated.csv --output-path artifacts/model/candidate.joblib
     deps:
       - data/processed/validated.csv
       - src/fraud_scoring/train.py
@@ -18,12 +18,12 @@ stages:
       - src/fraud_scoring/data_utils.py
       - src/fraud_scoring/features.py
       - src/fraud_scoring/config.py
-      - configs/dev.yaml
+      - configs
     outs:
       - artifacts/model/candidate.joblib
 
   evaluate:
-    cmd: python -m fraud_scoring.evaluate --config configs/dev.yaml --data-path data/processed/validated.csv --model-path artifacts/model/candidate.joblib --output-path artifacts/evaluation/metrics.json
+    cmd: python -m fraud_scoring.evaluate --data-path data/processed/validated.csv --model-path artifacts/model/candidate.joblib --output-path artifacts/evaluation/metrics.json
     deps:
       - data/processed/validated.csv
       - artifacts/model/candidate.joblib
@@ -33,6 +33,6 @@ stages:
       - src/fraud_scoring/features.py
       - src/fraud_scoring/data_utils.py
       - src/fraud_scoring/config.py
-      - configs/dev.yaml
+      - configs
     metrics:
       - artifacts/evaluation/metrics.json

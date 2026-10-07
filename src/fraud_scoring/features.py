@@ -95,11 +95,27 @@ class OllamaMerchantCategoryClassifier:
     """Local Ollama adapter; it needs no cloud API key or paid account."""
 
     def __init__(self, model: str, base_url: str, timeout_seconds: float) -> None:
+        """Initialize the local provider connection settings.
+
+        Args:
+            model: Ollama model name used for constrained classification.
+            base_url: Ollama server base URL.
+            timeout_seconds: Maximum request duration.
+        """
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
     def classify(self, normalized_category: str, allowed_categories: frozenset[str]) -> str | None:
+        """Request one approved category from the local provider.
+
+        Args:
+            normalized_category: Canonical merchant label to classify.
+            allowed_categories: Categories accepted by the fitted model contract.
+
+        Returns:
+            An approved category, or `None` when classification is unavailable or invalid.
+        """
         try:
             allowed = sorted(allowed_categories)
             schema = {
@@ -147,10 +163,24 @@ class MerchantCategoryNormalizer:
     def __init__(
         self, classifier: MerchantCategoryClassifier | None = None, llm_enabled: bool = False
     ) -> None:
+        """Configure deterministic and optional provider-backed normalization.
+
+        Args:
+            classifier: Optional constrained classifier for unknown labels.
+            llm_enabled: Whether unknown labels may be sent to the classifier.
+        """
         self.classifier = classifier
         self.llm_enabled = llm_enabled
 
     def normalize(self, category: str) -> MerchantCategoryNormalization:
+        """Normalize one merchant category without expanding the model vocabulary.
+
+        Args:
+            category: Raw merchant category supplied by training or serving data.
+
+        Returns:
+            Normalization result and the source of its selected category.
+        """
         normalized_input = normalize_category_text(category)
         mapped = MERCHANT_CATEGORY_MAPPINGS.get(normalized_input)
         if mapped is not None:
@@ -221,6 +251,16 @@ def _require_columns(
     required_columns: tuple[str, ...],
     mode: Literal["training", "serving"],
 ) -> None:
+    """Validate required fields and the identity-only transaction identifier.
+
+    Args:
+        transactions: Raw rows supplied to a feature builder.
+        required_columns: Columns required for the selected feature-building mode.
+        mode: Whether the caller is building training or serving features.
+
+    Raises:
+        FeatureContractError: If required fields or identity values are invalid.
+    """
     if not isinstance(transactions, pd.DataFrame):
         raise FeatureContractError("Feature input must be a pandas DataFrame.")
 
@@ -276,11 +316,31 @@ def _build_features(
 
 
 def _require_numeric(series: pd.Series, column_name: str) -> None:
+    """Require a non-null, non-boolean numeric feature series.
+
+    Args:
+        series: Feature values to validate.
+        column_name: Feature name used in validation errors.
+
+    Raises:
+        FeatureContractError: If the series does not use a valid numeric dtype.
+    """
     if series.isna().any() or is_bool_dtype(series) or not is_numeric_dtype(series):
         raise FeatureContractError(f"'{column_name}' must use a non-null numeric dtype.")
 
 
 def _build_target(target: pd.Series) -> pd.Series:
+    """Validate and standardize the binary training target.
+
+    Args:
+        target: Raw fraud-label values from training data.
+
+    Returns:
+        Integer target series with the configured target name.
+
+    Raises:
+        FeatureContractError: If the target dtype or values are invalid.
+    """
     if target.isna().any() or is_bool_dtype(target) or not is_integer_dtype(target):
         raise FeatureContractError(f"'{TARGET_COLUMN}' must use a non-null integer dtype.")
     if not target.isin([0, 1]).all():

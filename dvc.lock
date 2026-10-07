@@ -26,22 +26,22 @@ stages:
       md5: b752c24368e715d38aaf208104edbe16
       size: 190420
   train:
-    cmd: python -m fraud_scoring.train --config configs/dev.yaml --data-path 
-      data/processed/validated.csv --output-path 
-      artifacts/model/candidate.joblib
+    cmd: python -m fraud_scoring.train --data-path data/processed/validated.csv
+      --output-path artifacts/model/candidate.joblib
     deps:
-    - path: configs/dev.yaml
+    - path: configs
       hash: md5
-      md5: 55ced9554cbafda9cccf7747356533b5
-      size: 1205
+      md5: 3bdab8cdc7a77e0c066d13b85f3b7eab.dir
+      size: 3589
+      nfiles: 3
     - path: data/processed/validated.csv
       hash: md5
       md5: b752c24368e715d38aaf208104edbe16
       size: 190420
     - path: src/fraud_scoring/config.py
       hash: md5
-      md5: d8a220f433c5a4bb2891501d1d10e801
-      size: 6635
+      md5: 79741c85cee2a1375b9605589da20921
+      size: 6453
     - path: src/fraud_scoring/data_utils.py
       hash: md5
       md5: 6e260b28b51e2e569f72cea61119933b
@@ -61,29 +61,30 @@ stages:
     outs:
     - path: artifacts/model/candidate.joblib
       hash: md5
-      md5: 25fcd9771f7a38d4ae7ecdf88cc9b94a
-      size: 6579
+      md5: 49ca9990c60276448ee544ad1479e207
+      size: 6704
   evaluate:
-    cmd: python -m fraud_scoring.evaluate --config configs/dev.yaml --data-path 
+    cmd: python -m fraud_scoring.evaluate --data-path
       data/processed/validated.csv --model-path artifacts/model/candidate.joblib
       --output-path artifacts/evaluation/metrics.json
     deps:
     - path: artifacts/model/candidate.joblib
       hash: md5
-      md5: 25fcd9771f7a38d4ae7ecdf88cc9b94a
-      size: 6579
-    - path: configs/dev.yaml
+      md5: 49ca9990c60276448ee544ad1479e207
+      size: 6704
+    - path: configs
       hash: md5
-      md5: 55ced9554cbafda9cccf7747356533b5
-      size: 1205
+      md5: 3bdab8cdc7a77e0c066d13b85f3b7eab.dir
+      size: 3589
+      nfiles: 3
     - path: data/processed/validated.csv
       hash: md5
       md5: b752c24368e715d38aaf208104edbe16
       size: 190420
     - path: src/fraud_scoring/config.py
       hash: md5
-      md5: d8a220f433c5a4bb2891501d1d10e801
-      size: 6635
+      md5: 79741c85cee2a1375b9605589da20921
+      size: 6453
     - path: src/fraud_scoring/data_utils.py
       hash: md5
       md5: 6e260b28b51e2e569f72cea61119933b

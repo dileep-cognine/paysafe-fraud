@@ -137,6 +137,7 @@ def generate_synthetic_transactions(
 
 
 def main():
+    """Generate the configured synthetic transaction CSV from command-line options."""
     parser = argparse.ArgumentParser(
         description="Generate synthetic transaction dataset for PaySafe Fraud Scoring"
     )

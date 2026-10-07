@@ -13,6 +13,14 @@ from fraud_scoring.train import save_candidate, train_candidate
 
 @pytest.fixture
 def training_csv(tmp_path):
+    """Create a deterministic synthetic dataset for evaluation tests.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+
+    Returns:
+        Path to the generated transaction CSV.
+    """
     path = tmp_path / "transactions.csv"
     generate_synthetic_transactions(n_records=600, fraud_ratio=0.15, random_seed=17).to_csv(
         path, index=False

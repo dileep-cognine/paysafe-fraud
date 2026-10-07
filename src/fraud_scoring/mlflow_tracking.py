@@ -31,6 +31,8 @@ from fraud_scoring.train import save_candidate, train_candidate
 
 @dataclass(frozen=True)
 class ExperimentOutcome:
+    """Tracked candidate, model URI, and evaluation result from one experiment."""
+
     run_id: str
     model_uri: str
     candidate: CandidateArtifact
@@ -44,6 +46,11 @@ def configure_tracking(config: AppConfig) -> str:
 
 
 def _git_commit() -> str | None:
+    """Return the current Git commit hash when the repository metadata is available.
+
+    Returns:
+        Current commit hash, or `None` when it cannot be resolved.
+    """
     try:
         completed = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
@@ -55,6 +62,12 @@ def _git_commit() -> str | None:
 
 
 def _log_parameters(config: AppConfig, candidate: CandidateArtifact) -> None:
+    """Log model, split, preprocessing, and feature-contract parameters.
+
+    Args:
+        config: Selected application configuration.
+        candidate: Fitted candidate whose contract is being tracked.
+    """
     params = {
         "model_type": config.model.algorithm,
         "random_seed": config.data.random_state,
@@ -68,6 +81,12 @@ def _log_parameters(config: AppConfig, candidate: CandidateArtifact) -> None:
 
 
 def _log_results(result: EvaluationResult, raw: pd.DataFrame) -> None:
+    """Log measured metrics, class counts, and quality-gate status.
+
+    Args:
+        result: Measured holdout evaluation result.
+        raw: Validated dataset used by the experiment.
+    """
     measured = asdict(result)
     mlflow.log_metrics(
         {
@@ -118,6 +137,13 @@ def _log_dataset(
     data_path: Path,
     candidate: CandidateArtifact,
 ) -> None:
+    """Log MLflow dataset input metadata and data-lineage tags.
+
+    Args:
+        raw: Validated dataset supplied to training.
+        data_path: Path to the source dataset.
+        candidate: Fitted candidate containing the dataset fingerprint.
+    """
     source = str(data_path.resolve())
 
     mlflow.log_input(
@@ -179,6 +205,18 @@ def _log_evaluation_artifacts(candidate: CandidateArtifact, raw: pd.DataFrame) -
 
 
 def _log_model(candidate: CandidateArtifact, raw: pd.DataFrame) -> str:
+    """Log the fitted pipeline with a serving signature and input example.
+
+    Args:
+        candidate: Fitted candidate to log.
+        raw: Validated rows used to derive a serving example.
+
+    Returns:
+        MLflow URI of the logged candidate model.
+
+    Raises:
+        TypeError: If MLflow does not return a model URI.
+    """
     example = build_serving_features(raw.drop(columns=[TARGET_COLUMN]).iloc[[0]])
     signature = infer_signature(example, candidate.pipeline.predict_proba(example))
     model_info = mlflow.sklearn.log_model(

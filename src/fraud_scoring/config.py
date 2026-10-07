@@ -15,8 +15,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Local development may use .env. Existing process variables, including CI
-# secrets, remain authoritative because override is deliberately False.
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
@@ -27,6 +25,8 @@ class StrictConfigModel(BaseModel):
 
 
 class DataConfig(StrictConfigModel):
+    """Data paths, identifiers, and split settings for one environment."""
+
     raw_data_path: str = "data/raw/transactions.csv"
     processed_train_path: str = "data/processed/train.parquet"
     processed_test_path: str = "data/processed/test.parquet"
@@ -38,6 +38,8 @@ class DataConfig(StrictConfigModel):
 
 
 class FeaturesConfig(StrictConfigModel):
+    """Feature groups and optional merchant-normalization settings."""
+
     numerical_features: List[str] = Field(
         default_factory=lambda: ["amount", "hour_of_day", "device_risk"]
     )
@@ -52,6 +54,8 @@ class FeaturesConfig(StrictConfigModel):
 
 
 class ModelConfig(StrictConfigModel):
+    """Model identity, parameters, and local candidate artifact path."""
+
     name: str = "paysafe-fraud-detector"
     alias: str = "champion"
     algorithm: str = "HistGradientBoostingClassifier"
@@ -60,6 +64,8 @@ class ModelConfig(StrictConfigModel):
 
 
 class EvaluationThresholds(StrictConfigModel):
+    """Minimum metric values required by the evaluation quality gate."""
+
     min_precision: float = Field(default=0.0, ge=0.0, le=1.0)
     min_recall: float = Field(default=0.0, ge=0.0, le=1.0)
     min_f1: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -69,16 +75,22 @@ class EvaluationThresholds(StrictConfigModel):
 
 
 class EvaluationConfig(StrictConfigModel):
+    """Evaluation thresholds and destination for measured metrics."""
+
     thresholds: EvaluationThresholds = Field(default_factory=EvaluationThresholds)
     metrics_path: str = "artifacts/evaluation/metrics.json"
 
 
 class MLflowConfig(StrictConfigModel):
+    """MLflow tracking endpoint and experiment identity."""
+
     tracking_uri: str = "http://localhost:5000"
     experiment_name: str = "paysafe-fraud-scoring"
 
 
 class ServerConfig(StrictConfigModel):
+    """Runtime settings for the FastAPI server process."""
+
     host: str = "0.0.0.0"
     port: int = 8000
     reload: bool = False
@@ -121,7 +133,17 @@ ENVIRONMENT_OVERRIDES: Dict[str, tuple[str, str]] = {
 
 
 def resolve_config_path(config_path: Optional[str | Path] = None) -> Path:
-    """Resolve configuration file path based on argument, environment variable, or APP_ENV."""
+    """Resolve a profile path using the configured precedence order.
+
+    Args:
+        config_path: Explicit YAML path supplied by a caller.
+
+    Returns:
+        Existing YAML profile selected from the argument, `CONFIG_PATH`, or `APP_ENV`.
+
+    Raises:
+        FileNotFoundError: If the selected configuration file does not exist.
+    """
     if config_path:
         path = Path(config_path)
         if not path.exists():
@@ -145,7 +167,18 @@ def resolve_config_path(config_path: Optional[str | Path] = None) -> Path:
 
 
 def load_config(config_path: Optional[str | Path] = None, force_reload: bool = False) -> AppConfig:
-    """Load, validate, and return the application configuration."""
+    """Load and validate the selected application profile.
+
+    Args:
+        config_path: Explicit YAML path supplied by a caller.
+        force_reload: Whether to bypass the cached implicit configuration.
+
+    Returns:
+        Validated application configuration with environment overrides applied.
+
+    Raises:
+        ValueError: If the YAML cannot be read or fails schema validation.
+    """
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None and not force_reload and config_path is None:
         return _CONFIG_CACHE
@@ -164,12 +197,6 @@ def load_config(config_path: Optional[str | Path] = None, force_reload: bool = F
         value = os.getenv(env_var)
         if value is not None and value.strip():
             raw_yaml.setdefault(section, {})[key] = value
-    # APP_ENV selects the default file when no explicit configuration was requested.
-    # An explicitly supplied config file is authoritative, which keeps validation
-    # and tests for other environments independent of the process environment.
-    if config_path is None and "APP_ENV" in os.environ:
-        raw_yaml["environment"] = os.environ["APP_ENV"]
-
     try:
         config = AppConfig(**raw_yaml)
     except ValidationError as e:

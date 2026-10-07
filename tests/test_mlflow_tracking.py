@@ -13,6 +13,14 @@ from fraud_scoring.mlflow_tracking import run_training_experiment
 
 @pytest.fixture
 def experiment_setup(tmp_path):
+    """Create isolated data and MLflow configuration for tracking tests.
+
+    Args:
+        tmp_path: Pytest temporary directory.
+
+    Returns:
+        Transaction CSV path and isolated application configuration.
+    """
     data_path = tmp_path / "transactions.csv"
     generate_synthetic_transactions(n_records=600, fraud_ratio=0.15, random_seed=17).to_csv(
         data_path, index=False

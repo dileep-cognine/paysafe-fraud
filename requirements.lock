@@ -163,7 +163,6 @@ SQLAlchemy==2.0.54
 sqlparse==0.6.0
 sqltrie==0.11.3
 starlette==1.6.0
-streamlit==1.64.0
 tabulate==0.10.0
 threadpoolctl==3.7.0
 toml==0.10.2

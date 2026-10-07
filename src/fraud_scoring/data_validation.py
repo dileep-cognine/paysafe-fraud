@@ -87,6 +87,12 @@ class DataValidationError(Exception):
     """Raised when dataset fails schema, completeness, or range checks."""
 
     def __init__(self, message: str, errors: Optional[List[str]] = None):
+        """Initialize a validation error with its individual failure messages.
+
+        Args:
+            message: Summary of the validation failure.
+            errors: Individual validation failures, when available.
+        """
         super().__init__(message)
         self.errors = errors or []
 
@@ -95,6 +101,12 @@ class DataLeakageError(Exception):
     """Raised when target label or post-auth fields leak into feature sets."""
 
     def __init__(self, message: str, leaked_columns: Optional[List[str]] = None):
+        """Initialize a leakage error with the detected leakage descriptions.
+
+        Args:
+            message: Summary of the leakage failure.
+            leaked_columns: Detected leakage descriptions or column names.
+        """
         super().__init__(message)
         self.leaked_columns = leaked_columns or []
 
@@ -106,12 +118,19 @@ class DataLeakageError(Exception):
 
 @dataclass
 class ValidationResult:
+    """Outcome and quality summary from raw transaction validation."""
+
     is_valid: bool
     total_records: int
     errors: List[str] = field(default_factory=list)
     quality_summary: Dict[str, Any] = field(default_factory=dict)
 
     def report(self) -> str:
+        """Format the validation outcome for command-line output.
+
+        Returns:
+            Human-readable validation status and any detected errors.
+        """
         if self.is_valid:
             return f"Validation PASSED: {self.total_records} records checked. No errors detected."
         lines = [
@@ -430,6 +449,14 @@ def _normalize_known_merchant_categories(df: pd.DataFrame) -> pd.DataFrame:
     normalized_df = df.copy()
 
     def normalized_or_original(value: object) -> object:
+        """Normalize known aliases while retaining non-string values for validation.
+
+        Args:
+            value: Raw merchant-category cell value.
+
+        Returns:
+            Normalized category for known text values, otherwise the original value.
+        """
         if not isinstance(value, str):
             return value
         result = normalize_merchant_category(value)
@@ -447,6 +474,7 @@ def _normalize_known_merchant_categories(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    """Run the raw-data validation gate from the command line."""
     parser = argparse.ArgumentParser(
         description="Validate transaction data quality, schema, and leakage"
     )

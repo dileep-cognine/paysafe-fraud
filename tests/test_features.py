@@ -16,6 +16,11 @@ from fraud_scoring.features import (
 
 @pytest.fixture
 def raw_training_transactions() -> pd.DataFrame:
+    """Provide minimally valid raw rows with intentionally unordered columns.
+
+    Returns:
+        Training transaction rows used by feature-contract tests.
+    """
     return pd.DataFrame(
         {
             "device_risk": [0.20, 0.85],

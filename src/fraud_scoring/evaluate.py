@@ -28,6 +28,8 @@ from fraud_scoring.features import TRAINING_FEATURES, build_training_features
 
 @dataclass(frozen=True)
 class EvaluationResult:
+    """Measured holdout metrics and quality-gate outcome for a candidate."""
+
     precision: float
     recall: float
     f1: float
@@ -42,7 +44,15 @@ class EvaluationResult:
 
 
 def quality_gate(metrics: dict[str, float], thresholds: EvaluationThresholds) -> tuple[str, ...]:
-    """Return every missed threshold; an empty tuple means the candidate passes."""
+    """Compare measured metrics with the configured quality thresholds.
+
+    Args:
+        metrics: Measured values keyed by quality-gate metric name.
+        thresholds: Minimum values required for the selected environment.
+
+    Returns:
+        Descriptions of every unmet threshold, or an empty tuple when the gate passes.
+    """
     required = {
         "precision": thresholds.min_precision,
         "recall": thresholds.min_recall,
@@ -106,6 +116,7 @@ def save_evaluation(result: EvaluationResult, path: Path) -> None:
 
 
 def main() -> None:
+    """Evaluate a local candidate selected by command-line or environment configuration."""
     parser = argparse.ArgumentParser(description="Evaluate a local fraud-scoring candidate")
     parser.add_argument(
         "--config",

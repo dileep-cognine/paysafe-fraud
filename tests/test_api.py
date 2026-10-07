@@ -21,6 +21,14 @@ VALID_REQUEST = {
 
 @pytest.fixture
 def client(monkeypatch):
+    """Provide a test client backed by a deterministic approved-model stub.
+
+    Args:
+        monkeypatch: Pytest fixture used to replace registry model loading.
+
+    Yields:
+        Test client, model stub, and model-loading stub.
+    """
     model = Mock()
     model.classes_ = [0, 1]
     model.predict_proba.return_value = [[0.13, 0.87]]

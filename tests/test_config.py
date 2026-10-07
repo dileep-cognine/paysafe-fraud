@@ -106,10 +106,37 @@ def test_llm_category_mapping_environment_overrides(monkeypatch):
 def test_explicit_config_path_ignores_app_env(monkeypatch):
     """An explicit profile must not be relabelled by the runner's APP_ENV."""
     monkeypatch.setenv("APP_ENV", "ci")
+    monkeypatch.setenv("CONFIG_PATH", "configs/prod.yaml")
 
     config = load_config("configs/dev.yaml", force_reload=True)
 
     assert config.environment == "dev"
+
+
+def test_config_path_precedes_app_env(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "prod")
+    monkeypatch.setenv("CONFIG_PATH", "configs/ci.yaml")
+
+    config = load_config(force_reload=True)
+
+    assert config.environment == "ci"
+
+
+def test_app_env_selects_profile_when_config_path_is_unset(monkeypatch):
+    monkeypatch.delenv("CONFIG_PATH", raising=False)
+    monkeypatch.setenv("APP_ENV", "ci")
+
+    config = load_config(force_reload=True)
+
+    assert config.environment == "ci"
+    assert config.model.alias == "challenger"
+
+
+def test_missing_config_path_fails_loudly(monkeypatch):
+    monkeypatch.setenv("CONFIG_PATH", "configs/missing.yaml")
+
+    with pytest.raises(FileNotFoundError, match="CONFIG_PATH points to non-existent file"):
+        resolve_config_path()
 
 
 def test_unknown_environment_fails_loudly(monkeypatch):

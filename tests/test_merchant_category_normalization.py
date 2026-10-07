@@ -11,12 +11,32 @@ from fraud_scoring.features import (
 
 
 class StubClassifier:
+    """Configurable merchant-category classifier used by normalization tests."""
+
     def __init__(self, response: str | None = None, error: Exception | None = None) -> None:
+        """Initialize the response or error returned by the stub.
+
+        Args:
+            response: Category returned by the stub classifier.
+            error: Error raised instead of returning a category.
+        """
         self.response = response
         self.error = error
         self.calls = 0
 
     def classify(self, normalized_category: str, allowed_categories: frozenset[str]) -> str | None:
+        """Return the configured response or raise the configured error.
+
+        Args:
+            normalized_category: Canonical category supplied by the normalizer.
+            allowed_categories: Categories allowed by the model contract.
+
+        Returns:
+            Configured category response, when no error is configured.
+
+        Raises:
+            Exception: The configured classifier error.
+        """
         self.calls += 1
         if self.error:
             raise self.error
