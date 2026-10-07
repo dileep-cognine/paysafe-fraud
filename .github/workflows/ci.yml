@@ -96,14 +96,15 @@ jobs:
       - name: Prepare image-scan output directory
         run: mkdir -p artifacts/security
 
-      - name: Scan final image for high and critical vulnerabilities
+      - name: Generate Trivy report for final image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_TAG }}
           format: json
           output: artifacts/security/trivy-image.json
           severity: HIGH,CRITICAL
-          exit-code: "1"
+          scanners: vuln
+          exit-code: "0"
 
       - name: Upload Trivy image scan
         if: always()
@@ -132,6 +133,15 @@ jobs:
           name: container-sbom-spdx-${{ github.sha }}
           path: sbom/paysafe-fraud-scoring.spdx.json
           if-no-files-found: error
+
+      - name: Enforce high and critical vulnerability gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: table
+          severity: HIGH,CRITICAL
+          scanners: vuln
+          exit-code: "1"
 
   secret-hygiene:
     name: Verify secret hygiene
