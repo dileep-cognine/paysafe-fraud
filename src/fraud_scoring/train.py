@@ -69,6 +69,7 @@ def save_candidate(candidate: CandidateArtifact, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(candidate, path)
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a local fraud-scoring candidate")
     parser.add_argument(

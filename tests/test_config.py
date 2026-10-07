@@ -73,13 +73,22 @@ def test_config_missing_required_section_fails_loudly():
             incomplete_config.unlink()
 
 
-def test_env_var_override(monkeypatch):
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", "sqlite:///test_override.db")
+@pytest.mark.parametrize("tracking_uri", ["sqlite:///test_override.db", "http://mlflow:5000"])
+def test_env_var_override(monkeypatch, tracking_uri):
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("MODEL_ALIAS", "test_candidate")
 
     config = load_config("configs/dev.yaml", force_reload=True)
-    assert config.mlflow.tracking_uri == "sqlite:///test_override.db"
+    assert config.mlflow.tracking_uri == tracking_uri
     assert config.model.alias == "test_candidate"
+
+
+def test_blank_environment_override_keeps_profile_value(monkeypatch):
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "")
+
+    config = load_config("configs/dev.yaml", force_reload=True)
+
+    assert config.mlflow.tracking_uri == "http://localhost:5000"
 
 
 def test_llm_category_mapping_environment_overrides(monkeypatch):

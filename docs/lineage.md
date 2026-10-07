@@ -26,6 +26,22 @@ evaluate
         │
         ▼
 artifacts/evaluation/metrics.json
+        │
+        ▼
+MLflow run (dataset fingerprint, parameters, metrics, feature contract,
+            confusion matrix, signature, input example)
+        │
+        ▼
+registered model: paysafe-fraud-detector
+        │
+        ▼
+approved alias: @champion
+        │
+        ▼
+FastAPI startup resolves and pins the approved version
+        │
+        ▼
+POST /score → risk_score + model_version
 ```
 
 Git tracks `dvc.yaml`, `dvc.lock`, `data/raw/transactions.csv.dvc`, source,
@@ -53,3 +69,22 @@ the measured metrics and exits nonzero when its configured quality gate fails.
 The independent MLflow command records a complete real experiment for a
 validated dataset; promotion subsequently rechecks that recorded gate before
 the `champion` alias can move.
+
+The DVC pointer and lock file identify the raw dataset and reproducible stage
+dependencies. MLflow records the dataset SHA-256, DVC digest when the tracked
+raw CSV is supplied, run ID, logged-model URI, evaluation artifacts, and model
+signature. Registry promotion records the source run; serving returns the exact
+pinned registry version in every `/score` response.
+
+The current DVC remote is local. To migrate later, configure an approved remote
+without claiming it is already active:
+
+```bash
+dvc remote add -d production s3://<bucket>/<prefix>
+# or
+dvc remote add -d production gs://<bucket>/<prefix>
+dvc push
+```
+
+Authenticate S3/GCS through the deployment environment or credential manager;
+do not commit credentials to DVC configuration or `.env.example`.
