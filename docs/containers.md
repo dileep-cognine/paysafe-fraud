@@ -26,7 +26,7 @@ docker run --rm --publish 8000:8000 \
   --env API_HOST=0.0.0.0 \
   --env API_PORT=8000 \
   --env API_WORKERS=1 \
-  --env LOG_LEVEL=INFO \
+  --env LOG_LEVEL=info \
   paysafe-fraud-scoring:latest
 ```
 
@@ -38,37 +38,35 @@ live on the host filesystem and are not a shared production service.
 
 ## Docker Compose
 
-`compose.yaml` runs the same API image and keeps MLflow external, matching the
-application's approved-alias design. Start the MLflow server described in the
-README first, then start the API from the repository root:
+`compose.yaml` runs a persistent MLflow tracking server and the same API image.
+MLflow metadata and proxied artifacts live in the named `mlflow-data` volume.
+Start MLflow first from the repository root:
 
 ```powershell
-docker compose up --build
+docker compose up -d mlflow
 ```
 
-Compose uses `COMPOSE_MLFLOW_TRACKING_URI`, which defaults to
-`http://host.docker.internal:5000`. This is intentionally separate from
-`MLFLOW_TRACKING_URI` in `.env`, because `localhost` inside the API container
-would refer to the container itself. Set a different reachable registry before
-starting Compose when necessary:
+Open `http://localhost:5000` to inspect the registry. Local training and
+promotion commands use `MLFLOW_TRACKING_URI=http://localhost:5000`. The API
+uses the internal service address `http://mlflow:5000`; this is the default
+value of `COMPOSE_MLFLOW_TRACKING_URI`.
+
+On a new `mlflow-data` volume, create and promote a real passing candidate
+before starting the API:
 
 ```powershell
-$env:COMPOSE_MLFLOW_TRACKING_URI = "https://mlflow.example.internal"
-docker compose up --build
+$env:MLFLOW_TRACKING_URI = "http://localhost:5000"
+python -m fraud_scoring.mlflow_tracking --config configs/dev.yaml
+python -m fraud_scoring.model_registry promote --config configs/dev.yaml --run-id <REAL_RUN_ID> --model-uri <REAL_MODEL_URI>
+docker compose up -d --build api
 ```
 
 The API is published on `http://localhost:8000` by default. Set
-`COMPOSE_API_PORT` to use another host port, inspect status with
-`docker compose ps`, and stop it with `docker compose down`. The compose file
-does not mount local model artifacts, a SQLite database, or `.env` into the
-container.
-
-Older direct-SQLite runs may record model artifacts using host-specific
-`file:` paths. A Linux container cannot resolve Windows host paths, even if the
-database file is mounted. Configure a network-reachable MLflow server with
-remotely accessible or proxied artifacts before running `/score` in a container.
-This preserves the approved-alias architecture instead of copying a local
-candidate artifact into the image.
+`COMPOSE_API_PORT` to use another host port, and `COMPOSE_MLFLOW_PORT` to move
+the MLflow UI and local-client port together. Inspect status with
+`docker compose ps`, stop services with `docker compose down`, and retain the
+registry with the named volume. `docker compose down -v` deliberately deletes
+the MLflow database and artifacts.
 
 Check the running image:
 
@@ -177,43 +175,19 @@ generates `sbom/paysafe-fraud-scoring.spdx.json` from that exact image, verifies
 that it has packages, and uploads it as the `container-sbom-spdx-<sha>` workflow
 artifact. It does not commit the SBOM or add a separate branch-protection check.
 
-## Existing local registry with Docker Desktop
+## Compose-managed local registry
 
-Both local and Docker APIs use the same MLflow HTTP server. Only the server
-opens `mlruns.db` and reads the artifact tree in `mlruns/`. Local clients use
-`http://localhost:5000`; Docker uses `http://host.docker.internal:5000`.
-The complete startup, scoring, and laptop-transfer commands are in
-[the README](../README.md#6-end-to-end-local-runbook).
-Do not pass the development `.env` wholesale to Docker: its localhost refers
-to the container itself. Supply the Docker tracking URI explicitly.
+Both local CLIs and the Docker API use the same Compose-managed MLflow service.
+Local clients use `http://localhost:5000`; the API uses `http://mlflow:5000` on
+the internal Compose network. No host MLflow process, host SQLite file, or
+artifact directory is mounted into the API container.
 
-The existing registry was backed up before migrating artifact metadata to
-`mlflow-artifacts:/` references. These paths are resolved relative to each
-client's tracking endpoint, so neither a Windows path nor a laptop IP is needed.
-The existing champion remains version 4; its run, metrics, model bytes, source
-identity, and alias are preserved. Migration evidence and the SQLite backup
-are under ignored `artifacts/`; `mlflow_portable_migration.json` records the
-changed fields and original values. This migration changes local registry
-state, not files shipped in Git. No model is copied into the image.
+The named `mlflow-data` volume stores the server's SQLite backend and proxied
+artifact files. It survives `docker compose down`; `docker compose down -v`
+deletes it. A pre-existing host-based MLflow registry is not imported
+automatically. Create and promote a real model through the running Compose
+server, or explicitly export and import the stopped volume when moving laptops.
 
-The migration covers the champion's logged-model location, its registered
-version's cached storage location, its source run artifact URI, and the local
-experiment roots for future logging. Other historical model/run references
-may still be host-specific. New experiments created through the server use
-proxied artifact locations by default. Direct SQLite tracking is no longer the
-application default: `mlflow-artifacts:/` downloads require HTTP tracking.
-CI tests continue to use isolated SQLite stores and need no running server.
-
-On another laptop, transfer the stopped server's database and complete artifact
-tree together, or run the real training and gated promotion workflow there.
-Never commit these files. For rollback, stop clients and restore the metadata
-fields recorded in the migration manifest; do not overwrite newer runs with
-an old full-database backup. Restoring old locations also restores their
-host/IP dependency.
-
-The server binds to all interfaces for Docker access with an explicit host
-allowlist. This unauthenticated HTTP setup is intended for a trusted local
-assessment network. Use authenticated HTTPS for shared deployments. Native
-Linux Docker Engine needs `--add-host=host.docker.internal:host-gateway`;
-Docker Desktop supplies the hostname automatically. Port 5000 was chosen to
-avoid the existing loopback MLflow service on port 5000.
+This unauthenticated HTTP setup is intended for a trusted local assessment
+environment. Use authenticated HTTPS and managed database/object storage for a
+shared deployment.

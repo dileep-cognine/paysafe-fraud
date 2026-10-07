@@ -208,17 +208,19 @@ put the local database, artifacts, or secrets into Git.
 
 ### 6.1 Start the MLflow server
 
-Start this in its own terminal and leave it running while you track, promote,
-or serve a model. The server owns the local SQLite backend; application clients
-connect to it over HTTP.
+Start the Compose-managed MLflow service. Its SQLite metadata and proxied
+artifacts are stored in the persistent Docker volume `mlflow-data`; no local
+MLflow process is required.
 
 ```powershell
-.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5000 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
+docker compose up -d mlflow
+docker compose ps
 ```
 
 Open `http://localhost:5000` to inspect experiments, runs, registered models,
-and aliases. If port 5000 is unavailable, choose another free port and set the
-same value for `MLFLOW_TRACKING_URI` in `.env`, the local shell, and Docker.
+and aliases. Wait for the `mlflow` service to report `healthy` before tracking
+or promoting. If port 5000 is unavailable, set `COMPOSE_MLFLOW_PORT` in `.env`
+and use the same host port for local training and promotion commands.
 
 ### 6.2 Restore or generate the synthetic data
 
@@ -287,8 +289,15 @@ If the quality gate passes, promote that exact run and logged-model URI. Do not
 replace the placeholders with an invented ID or URI.
 
 ```powershell
-python -m fraud_scoring.model_registry promote --config configs/dev.yaml --run-id <RUN_ID_PRINTED_BY_TRACKING> --model-uri <MODEL_URI_PRINTED_BY_TRACKING>
+python -m fraud_scoring.model_registry promote `
+  --config configs/dev.yaml `
+  --run-id <RUN_ID_PRINTED_BY_TRACKING> `
+  --model-uri models:/m-<LOGGED_MODEL_ID_PRINTED_BY_TRACKING>
 ```
+
+The logged model URI printed by tracking already has the required `models:/`
+prefix, for example `models:/m-abc123`. Preserve that prefix; passing only an
+`m-...` identifier is rejected by the promotion gate.
 
 The promotion command exits without moving the alias if the run fails its
 quality gate. Inspect the real run in MLflow before retrying or promoting.
@@ -318,40 +327,29 @@ values are rejected with HTTP 422.
 
 ### 6.6 Build and run the Docker API
 
-Keep the MLflow server from Section 6.1 running. Docker Desktop exposes the
-host service through `host.docker.internal`; the image receives that URI at
-runtime and never bundles the registry or model artifact.
+Compose runs both the MLflow service and the API on its internal network. The
+API uses `http://mlflow:5000` and does not depend on a separately started host
+process. Run this after promoting a real, quality-gated model to `@champion`:
 
 ```powershell
-docker build -t paysafe-fraud-scoring:v1 .
-docker run --rm -p 8000:8000 -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 paysafe-fraud-scoring:v1
+docker compose up -d --build api
+docker compose logs -f api
 ```
 
-The same API deployment can be started with Compose after the MLflow server is
-running:
-
-```powershell
-docker compose up --build
-```
-
-Compose defaults to `http://host.docker.internal:5000` for the external MLflow
-server. See [container instructions](docs/containers.md#docker-compose) for
-environment overrides and shutdown commands.
+On a new volume, start only `mlflow`, create and promote a real candidate using
+Section 6.4, then start the API. See [container instructions](docs/containers.md#docker-compose)
+for the exact commands and persistence behavior.
 
 Use the same verification requests from Section 6.5. To run the local API and
-Docker API together, use `-p 18000:8000` for Docker and substitute port 18000
-in the verification URLs. On native Linux Docker Engine, append
-`--add-host=host.docker.internal:host-gateway` to `docker run`.
+Docker API together, set `COMPOSE_API_PORT=18000` and substitute port 18000 in
+the verification URLs.
 
 ### 6.7 Move the runnable local setup to another laptop
 
-Git and DVC do not contain the local MLflow registry or artifacts. To move the
-same approved champion, stop MLflow and all API clients on the source machine,
-then transfer `mlruns.db` and the complete `mlruns/` directory to the root of
-the destination clone. Start the MLflow server in Section 6.1 on the destination
-machine, then use the local or Docker commands above. Keep this state out of
-Git. Alternatively, run the real tracking and gated-promotion workflow there to
-create a new approved version.
+Git and DVC do not contain the Compose MLflow registry or artifacts. They persist
+in Docker's `mlflow-data` named volume. To move an approved champion to another
+laptop, export that stopped volume and import it there, or rerun the real
+training and gated-promotion workflow. Keep registry data out of Git.
 
 ## 7. Verification & Quality Gates
 
@@ -449,13 +447,12 @@ the current `.env.example`, local runs use `http://localhost:5000` and the
 from the repository root before running tracking, promotion, or inference:
 
 ```powershell
-.\venv\Scripts\mlflow.exe server --backend-store-uri sqlite:///mlruns.db --serve-artifacts --artifacts-destination ./mlruns --host 0.0.0.0 --port 5000 --workers 1 --allowed-hosts "localhost:*,127.0.0.1:*,host.docker.internal:*"
+docker compose up -d mlflow
 ```
 
 Open `http://localhost:5000` for the UI. SQLite is the server's backend;
-application clients use HTTP. Do not pass the HTTP tracking URL as the server's
-`--backend-store-uri`. The server proxies `mlflow-artifacts:/` references to
-files under `./mlruns`.
+application clients use HTTP. The server proxies `mlflow-artifacts:/` references
+to the persistent `mlflow-data` Docker volume.
 
 Each run records model type and hyperparameters, seed, split fraction, feature
 names, and preprocessing; the measured evaluation metrics and class/row counts;
