@@ -25,6 +25,7 @@ def prepare_dataset(input_path: Path, output_path: Path) -> None:
 
 
 def main() -> None:
+    """Prepare a validated dataset from command-line input and output paths."""
     parser = argparse.ArgumentParser(description="Prepare validated fraud-scoring training data")
 
     parser.add_argument(

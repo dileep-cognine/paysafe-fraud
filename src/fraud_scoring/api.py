@@ -39,17 +39,32 @@ class ScoreRequest(BaseModel):
     @field_validator("transaction_id")
     @classmethod
     def nonblank_id(cls, value: str) -> str:
+        """Reject transaction identifiers containing only whitespace.
+
+        Args:
+            value: Submitted transaction identifier.
+
+        Returns:
+            The validated identifier.
+
+        Raises:
+            ValueError: If the identifier is blank after trimming whitespace.
+        """
         if not value.strip():
             raise ValueError("transaction_id must not be blank")
         return value
 
 
 class ScoreResponse(BaseModel):
+    """Fraud-score response for one validated transaction."""
+
     risk_score: float = Field(ge=0, le=1)
     model_version: str
 
 
 class HealthResponse(BaseModel):
+    """Readiness state of the approved-model service."""
+
     status: str
     model_loaded: bool
 
@@ -79,6 +94,17 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        """Load and release the model resources for one application process.
+
+        Args:
+            application: FastAPI application receiving managed state.
+
+        Yields:
+            Control while the approved model is available.
+
+        Raises:
+            RuntimeError: If the approved model cannot be loaded at startup.
+        """
         application.state.category_normalizer = category_normalizer
         try:
             application.state.champion = load_champion(selected)
@@ -96,6 +122,17 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     @application.get("/health", response_model=HealthResponse)
     def health(request: Request) -> HealthResponse:
+        """Return readiness for the model pinned in application state.
+
+        Args:
+            request: Incoming request with application state.
+
+        Returns:
+            Current service readiness information.
+
+        Raises:
+            HTTPException: If no approved model is loaded.
+        """
         champion: LoadedChampion | None = getattr(request.app.state, "champion", None)
         if champion is None:
             raise HTTPException(status_code=503, detail="Model unavailable")
@@ -116,6 +153,18 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     @application.post("/score", response_model=ScoreResponse)
     def score(payload: ScoreRequest, request: Request) -> ScoreResponse:
+        """Score one transaction with the loaded approved model.
+
+        Args:
+            payload: Validated authorization-time transaction fields.
+            request: Incoming request with application state.
+
+        Returns:
+            Fraud probability and pinned model version.
+
+        Raises:
+            HTTPException: If the model is unavailable or scoring cannot complete.
+        """
         started = time.perf_counter()
         champion: LoadedChampion | None = getattr(request.app.state, "champion", None)
         if champion is None:
@@ -159,6 +208,7 @@ app = create_app()
 
 
 def main() -> None:
+    """Start Uvicorn with configuration selected by the command line or environment."""
     parser = argparse.ArgumentParser(description="Start the fraud-scoring API")
     parser.add_argument("--config", help="YAML profile; defaults to APP_ENV / CONFIG_PATH")
     args = parser.parse_args()

@@ -18,6 +18,8 @@ from fraud_scoring.features import build_serving_features
 
 @dataclass(frozen=True)
 class LoadedChampion:
+    """Approved model and pinned registry version loaded for serving."""
+
     model: Any
     version: str
 

@@ -64,6 +64,11 @@ dvc status
 dvc push
 ```
 
+The DVC stages do not hardcode a profile. Without an explicit CLI profile, the
+shared loader selects `configs/<APP_ENV>.yaml`; CI sets `APP_ENV=ci`, while a
+normal local run defaults to `dev`. `CONFIG_PATH` intentionally overrides that
+selection when a reviewer needs a specific profile.
+
 `prepare` fails on schema, quality, or leakage violations. `evaluate` writes
 the measured metrics and exits nonzero when its configured quality gate fails.
 The independent MLflow command records a complete real experiment for a

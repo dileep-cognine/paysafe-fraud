@@ -7,5 +7,12 @@ from pathlib import Path
 
 
 def dataset_sha256(path: Path) -> str:
-    """Fingerprint the exact dataset bytes used by training/evaluation."""
+    """Calculate the SHA-256 fingerprint of a dataset file.
+
+    Args:
+        path: Dataset file to fingerprint.
+
+    Returns:
+        Hexadecimal SHA-256 digest of the file bytes.
+    """
     return hashlib.sha256(path.read_bytes()).hexdigest()

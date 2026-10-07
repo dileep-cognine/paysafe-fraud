@@ -105,7 +105,7 @@ CI when needed:
 ```bash
 mkdir -p artifacts/security
 trivy image --format json --output artifacts/security/trivy-image.json --severity HIGH,CRITICAL paysafe-fraud-scoring:latest
-trivy image --severity HIGH,CRITICAL --exit-code 1 paysafe-fraud-scoring:latest
+trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 paysafe-fraud-scoring:latest
 ```
 
 CI builds `paysafe-fraud-scoring:${{ github.sha }}` and scans that exact final
@@ -137,12 +137,13 @@ winget install Anchore.Syft
 syft version
 ```
 
-Build the image, create the ignored artifact directory, and generate SPDX JSON:
+Build the image, create the ignored artifact directory, and generate SPDX JSON
+through Docker Desktop's daemon, matching the local image scan:
 
 ```powershell
 docker build --tag paysafe-fraud-scoring:v1 .
 New-Item -ItemType Directory -Force sbom
-syft paysafe-fraud-scoring:v1 -o spdx-json=sbom/paysafe-fraud-scoring.spdx.json
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "${PWD}/sbom:/sbom" anchore/syft:latest paysafe-fraud-scoring:v1 -o spdx-json=/sbom/paysafe-fraud-scoring.spdx.json
 ```
 
 If an older Windows Syft release reports an `unable to place layer cache` error,

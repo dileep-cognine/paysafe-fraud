@@ -29,6 +29,8 @@ class PromotionRejected(ValueError):
 
 @dataclass(frozen=True)
 class PromotionResult:
+    """Registry version and alias details produced by an approved promotion."""
+
     model_name: str
     version: str
     alias: str
@@ -100,6 +102,16 @@ def _existing_version(client: MlflowClient, name: str, model_id: str, run_id: st
 
 
 def _current_alias_version(client: MlflowClient, name: str, alias: str) -> str | None:
+    """Return the current version for an alias when one has been assigned.
+
+    Args:
+        client: MLflow client connected to the selected tracking store.
+        name: Registered model name.
+        alias: Alias to inspect.
+
+    Returns:
+        Current version string, or `None` when the alias is unassigned.
+    """
     try:
         return str(client.get_model_version_by_alias(name, alias).version)
     except MlflowException as exc:
@@ -143,6 +155,7 @@ def promote_model(config: AppConfig, run_id: str, model_uri: str) -> PromotionRe
 
 
 def main() -> None:
+    """Run the explicit MLflow promotion command-line interface."""
     parser = argparse.ArgumentParser(description="Promote an eligible MLflow candidate")
     commands = parser.add_subparsers(dest="command", required=True)
     promote = commands.add_parser("promote", help="register and assign the configured alias")

@@ -14,7 +14,6 @@
 | FastAPI scoring | `/health`, `/model-info`, `/score`, `/docs` | `pytest tests/test_api.py` |
 | Docker build and non-root runtime | multi-stage `Dockerfile`, `.dockerignore`, `appuser` | `docker build --tag paysafe-fraud-scoring:local .` |
 | Scanning and SBOM awareness | documented in `docs/containers.md` | **PARTIAL:** run scanner/SBOM command in release environment |
-| Optional UI client | `ui/app.py` calls FastAPI only | `streamlit run ui/app.py` with healthy API |
 | CI | `.github/workflows/ci.yml` checks format, lint, type, test, data, Docker, secrets | GitHub Actions after push/PR |
 | Branch protection | manual GitHub settings in `docs/branch-protection.md` | **TODO:** maintainer must enable repository settings |
 | Final walkthrough | README, design, lineage, and this checklist | Follow README walkthrough sequence |

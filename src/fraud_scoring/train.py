@@ -71,6 +71,7 @@ def save_candidate(candidate: CandidateArtifact, path: Path) -> None:
 
 
 def main() -> None:
+    """Train and save a local candidate selected by command-line configuration."""
     parser = argparse.ArgumentParser(description="Train a local fraud-scoring candidate")
     parser.add_argument(
         "--config",
