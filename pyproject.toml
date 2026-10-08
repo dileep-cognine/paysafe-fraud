@@ -7,7 +7,7 @@ name = "fraud-scoring"
 version = "0.1.0"
 description = "PaySafe Fraud Scoring MLOps Pipeline and Scoring Service"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.13,<3.14"
 license = { text = "MIT" }
 authors = [
     { name = "Dileep Samaji" }
@@ -56,18 +56,18 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 files = ["src"]
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = ["joblib", "sklearn.*"]

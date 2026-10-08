@@ -1,6 +1,6 @@
-# PaySafe Fraud Scoring MLOps Pipeline
+﻿# PaySafe Fraud Scoring MLOps Pipeline
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![MLflow](https://img.shields.io/badge/tracking-MLflow-0194E2.svg)](https://mlflow.org/)
 [![DVC](https://img.shields.io/badge/data-DVC-945DD6.svg)](https://dvc.org/)
@@ -114,7 +114,7 @@ cd paysafe-fraud
 ```
 
 ### 4.2 Prerequisites
-- Python 3.10, 3.11, 3.12, or 3.13
+- Python 3.13
 - Git
 - Docker (optional, for container deployment)
 
@@ -206,6 +206,12 @@ Run the following from the repository root after completing the setup in
 Section 4. The commands use the current HTTP MLflow configuration and do not
 put the local database, artifacts, or secrets into Git.
 
+For a first Docker-backed run, complete Sections 6.1 through 6.4 in order, then
+start the Docker API in Section 6.6. Section 6.5 is optional: it verifies the
+same approved champion with a local FastAPI process. Do not start the API on a
+new MLflow volume before promotion; it correctly exits when `@champion` does
+not exist.
+
 ### 6.1 Start the MLflow server
 
 Start the Compose-managed MLflow service. Its SQLite metadata and proxied
@@ -224,14 +230,17 @@ and use the same host port for local training and promotion commands.
 
 ### 6.2 Restore or generate the synthetic data
 
-The repository is already initialized for DVC. If the configured local remote
-is available, restore the tracked raw data:
+The repository is already initialized for DVC. Its default remote is named
+`local` and points to `../../paysafe-fraud-dvc-storage` relative to
+`.dvc/config`. This is a local filesystem folder, not a cloud remote. Confirm
+it exists on the current laptop before restoring the tracked raw data:
 
 ```powershell
+dvc remote list
 dvc pull
 ```
 
-If no DVC remote is available for a fresh assessment checkout, generate the
+On another laptop, that local folder may not exist. In that case, generate the
 documented synthetic demonstration data instead:
 
 ```powershell
@@ -254,12 +263,26 @@ candidate artifact, and evaluation metrics. It does not create an MLflow run or
 promote a model.
 
 ```powershell
+# Ensure DVC selects configs/dev.yaml even if a local .env defines CONFIG_PATH.
+$env:CONFIG_PATH = ""
 $env:APP_ENV = "dev"
 dvc status
 dvc repro
 dvc status
 dvc dag
 ```
+
+If Windows reports `unable to open database file`, DVC cannot write its default
+machine-wide state cache. Configure an ignored, user-writable cache once, then
+repeat the commands above:
+
+```powershell
+$dvcCache = Join-Path $env:LOCALAPPDATA "paysafe-fraud-scoring\dvc-cache"
+dvc config --local core.site_cache_dir $dvcCache
+```
+
+This writes only `.dvc/config.local`, which is ignored by Git and remains local
+to that checkout.
 
 `dvc.yaml` deliberately does not name a profile. It uses the same configuration
 resolution as the Python CLIs: local runs select `dev` by default, while CI sets
@@ -344,7 +367,28 @@ Use the same verification requests from Section 6.5. To run the local API and
 Docker API together, set `COMPOSE_API_PORT=18000` and substitute port 18000 in
 the verification URLs.
 
-### 6.7 Move the runnable local setup to another laptop
+### 6.7 Measure API latency
+
+The benchmark measures end-to-end client latency for a running `/score` API,
+including HTTP serialization and the API response. It warms the service before
+collecting concurrent requests and reports the nearest-rank p50 and p95 values.
+The command exits non-zero when a request fails or p95 exceeds the configured
+budget, so it can also be used in an approved release workflow.
+
+```powershell
+python -m fraud_scoring.benchmark `
+  --url http://127.0.0.1:8000/score `
+  --warmup-requests 10 `
+  --requests 100 `
+  --concurrency 10 `
+  --max-p95-ms 200
+```
+
+Run it only after `/health` reports `ok` and a real approved champion model is
+available. Record the JSON result from the actual environment; this repository
+does not claim a latency result until that command succeeds there.
+
+### 6.8 Move the runnable local setup to another laptop
 
 Git and DVC do not contain the Compose MLflow registry or artifacts. They persist
 in Docker's `mlflow-data` named volume. To move an approved champion to another
@@ -408,7 +452,7 @@ creates the candidate artifact without starting an MLflow run; evaluation
 creates the measured `metrics.json` and applies the configured quality gate.
 
 The repository is already initialized for DVC. Its committed configuration uses
-the local remote `../paysafe-fraud-dvc-storage`; do not run `dvc init` again in
+the local remote `../../paysafe-fraud-dvc-storage`; do not run `dvc init` again in
 a clone. Restore data when that remote is available, then inspect and reproduce
 the pipeline:
 
@@ -443,8 +487,9 @@ The tracking URI and experiment name come from the selected YAML profile or the
 `MLFLOW_TRACKING_URI` and `MLFLOW_EXPERIMENT_NAME` environment overrides. With
 the current `.env.example`, local runs use `http://localhost:5000` and the
 `fraud-scoring-dev` experiment. Without an experiment-name override,
-`configs/dev.yaml` uses `paysafe-fraud-scoring-dev`. Start the tracking server
-from the repository root before running tracking, promotion, or inference:
+`configs/dev.yaml` uses `paysafe-fraud-scoring-dev`. Start the Compose-managed
+MLflow service from the repository root before running tracking, promotion, or
+inference:
 
 ```powershell
 docker compose up -d mlflow
@@ -545,7 +590,8 @@ curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/model-info
 ```
 
-The response has numeric `risk_score` (0–1) and string `model_version` fields.
+The response has numeric `risk_score` (0–1, rounded to four decimal places) and
+string `model_version` fields.
 Invalid requests return 422; an unavailable model returns 503; unexpected
 prediction failures return a generic 500 while details stay in server logs.
 Logs record the model version and request duration without transaction values.
@@ -614,9 +660,10 @@ CRITICAL findings for review. See the
 [container vulnerability-scanning commands](docs/containers.md#image-vulnerability-scanning).
 
 Use the complete commands in the [end-to-end local runbook](#6-end-to-end-local-runbook).
-The Docker image connects to the host MLflow server at runtime; it never embeds
-the database or model artifacts. See [container instructions](docs/containers.md)
-for image security and release checks.
+When started through Compose, the Docker API connects to the internal MLflow
+service at runtime; it never embeds the database or model artifacts. See
+[container instructions](docs/containers.md) for image security and release
+checks.
 
 ## 13. Development workflow and CI
 
@@ -649,6 +696,13 @@ the image. Model promotion remains separate: `training → evaluation → qualit
 gate → explicit authorized promotion`. See [branch-protection guidance](docs/branch-protection.md)
 for the GitHub settings a repository maintainer should configure manually.
 
+CI, Docker, Ruff, and MyPy all use Python 3.13. Dependency installation applies
+`requirements.lock` as a constraints file and verifies the resolved environment
+with `python -m pip check`. A clean-checkout demonstration still needs an actual
+CI or local run: clone the repository, restore DVC data with `dvc pull`, run
+`dvc repro`, inspect `dvc.lock`, and retain the resulting MLflow run ID and
+GitHub Actions artifacts as evidence of reproducibility and lineage.
+
 ## 14. Assessment walkthrough
 
 1. Show `data/README.md`, `data_validation.py`, and its validation command.
@@ -657,6 +711,6 @@ for the GitHub settings a repository maintainer should configure manually.
 4. Open MLflow to inspect the actual run, artifacts, and model signature.
 5. Promote only an eligible model with the explicit registry command.
 6. Start FastAPI and call `/health`, `/model-info`, and `/score`.
-7. Build the Docker image and explain its non-root runtime and external MLflow requirement.
+7. Build the Docker image and explain its non-root runtime and Compose-managed MLflow dependency.
 8. Show CI, branch-protection guidance, `docs/lineage.md`, and the assessment checklist.
 

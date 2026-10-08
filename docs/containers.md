@@ -17,17 +17,7 @@ Run it with runtime configuration supplied by the deployment environment. Do
 not pass a committed `.env` file or copy credentials into the image.
 
 ```bash
-docker run --rm --publish 8000:8000 \
-  --env APP_ENV=prod \
-  --env MLFLOW_TRACKING_URI=https://mlflow.example.internal \
-  --env MLFLOW_EXPERIMENT_NAME=paysafe-fraud-scoring-prod \
-  --env MODEL_REGISTRY_NAME=paysafe-fraud-detector \
-  --env MODEL_ALIAS=champion \
-  --env API_HOST=0.0.0.0 \
-  --env API_PORT=8000 \
-  --env API_WORKERS=1 \
-  --env LOG_LEVEL=info \
-  paysafe-fraud-scoring:latest
+docker run --rm --publish 8000:8000 --env APP_ENV=prod --env MLFLOW_TRACKING_URI=https://mlflow.example.internal --env MLFLOW_EXPERIMENT_NAME=paysafe-fraud-scoring-prod --env MODEL_REGISTRY_NAME=paysafe-fraud-detector --env MODEL_ALIAS=champion --env API_HOST=0.0.0.0 --env API_PORT=8000 --env API_WORKERS=1 --env LOG_LEVEL=info paysafe-fraud-scoring:latest
 ```
 
 The application resolves `models:/<MODEL_REGISTRY_NAME>@<MODEL_ALIAS>` on
