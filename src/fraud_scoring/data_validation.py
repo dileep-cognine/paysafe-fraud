@@ -86,7 +86,7 @@ TARGET_DERIVED_SUFFIXES: tuple[str, ...] = ("_target", "_is_fraud", "_fraud_labe
 class DataValidationError(Exception):
     """Raised when dataset fails schema, completeness, or range checks."""
 
-    def __init__(self, message: str, errors: Optional[List[str]] = None):
+    def __init__(self, message: str, errors: Optional[List[str]] = None) -> None:
         """Initialize a validation error with its individual failure messages.
 
         Args:
@@ -100,7 +100,7 @@ class DataValidationError(Exception):
 class DataLeakageError(Exception):
     """Raised when target label or post-auth fields leak into feature sets."""
 
-    def __init__(self, message: str, leaked_columns: Optional[List[str]] = None):
+    def __init__(self, message: str, leaked_columns: Optional[List[str]] = None) -> None:
         """Initialize a leakage error with the detected leakage descriptions.
 
         Args:

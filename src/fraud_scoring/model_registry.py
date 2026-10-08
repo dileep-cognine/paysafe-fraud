@@ -7,6 +7,8 @@ import math
 from dataclasses import dataclass
 
 import mlflow
+from mlflow.entities import Run
+from mlflow.entities.model_registry import ModelVersion
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
@@ -38,7 +40,7 @@ class PromotionResult:
     previous_version: str | None
 
 
-def _require_eligible_run(client: MlflowClient, run_id: str, config: AppConfig):
+def _require_eligible_run(client: MlflowClient, run_id: str, config: AppConfig) -> Run:
     """Reapply Stage 4's quality gate to the run's recorded measurements."""
     try:
         run = client.get_run(run_id)
@@ -93,7 +95,9 @@ def _require_logged_model(client: MlflowClient, model_uri: str, run_id: str) -> 
     return model_id
 
 
-def _existing_version(client: MlflowClient, name: str, model_id: str, run_id: str):
+def _existing_version(
+    client: MlflowClient, name: str, model_id: str, run_id: str
+) -> ModelVersion | None:
     """Reuse an existing version so repeating a promotion does not duplicate it."""
     for version in client.search_model_versions(f"name = '{name}'"):
         if version.source == f"models:/{model_id}" and version.run_id == run_id:

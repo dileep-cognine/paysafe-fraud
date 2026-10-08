@@ -31,7 +31,7 @@ def client(monkeypatch):
     """
     model = Mock()
     model.classes_ = [0, 1]
-    model.predict_proba.return_value = [[0.13, 0.87]]
+    model.predict_proba.return_value = [[0.123456, 0.876543]]
     load = Mock(return_value=LoadedChampion(model=model, version="7"))
     monkeypatch.setattr(api, "load_champion", load)
     with TestClient(api.create_app(load_config("configs/dev.yaml"))) as test_client:
@@ -42,7 +42,7 @@ def test_valid_score_uses_serving_features_and_loads_once(client):
     test_client, model, load = client
     response = test_client.post("/score", json=VALID_REQUEST)
     assert response.status_code == 200
-    assert response.json() == {"risk_score": 0.87, "model_version": "7"}
+    assert response.json() == {"risk_score": 0.8765, "model_version": "7"}
     assert test_client.get("/health").json() == {"status": "healthy", "model_loaded": True}
     assert test_client.post("/score", json=VALID_REQUEST).status_code == 200
     load.assert_called_once()

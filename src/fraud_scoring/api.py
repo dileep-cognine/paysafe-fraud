@@ -23,6 +23,7 @@ from fraud_scoring.features import (
 from fraud_scoring.predict import LoadedChampion, load_champion, score_transaction
 
 logger = logging.getLogger(__name__)
+RISK_SCORE_DECIMAL_PLACES = 4
 
 
 class ScoreRequest(BaseModel):
@@ -194,7 +195,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             normalization.source,
             duration_ms,
         )
-        return ScoreResponse(risk_score=risk_score, model_version=champion.version)
+        return ScoreResponse(
+            risk_score=round(risk_score, RISK_SCORE_DECIMAL_PLACES),
+            model_version=champion.version,
+        )
 
     return application
 

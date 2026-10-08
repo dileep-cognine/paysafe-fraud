@@ -66,3 +66,16 @@ Maintainer approves promotion and alias movement. Registry write access should
 be limited to this role or a separately authorized CI/CD identity. The promotion
 command rechecks the recorded gate and current thresholds; rollback uses the
 same command with the earlier approved version's original identifiers.
+
+## Production promotion authorization
+
+The application quality gate is necessary but is not an authorization boundary.
+For a shared or production registry, grant alias-write permission only to an
+approved release identity or authorized maintainers. Give the serving API a
+separate read-only registry identity.
+
+If promotion is run from GitHub Actions, place that release workflow in a
+protected GitHub Environment with required reviewers and environment-scoped
+registry credentials. The workflow should run only after the required CI checks
+and the recorded quality gate have passed. These controls are external service
+settings; this repository documents them but does not claim they are enabled.

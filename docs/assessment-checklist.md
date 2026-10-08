@@ -12,10 +12,11 @@
 | MLflow tracking | run parameters, metrics, data input, artifact, signature, example | `pytest tests/test_mlflow_tracking.py` |
 | Registry and explicit alias promotion | `model_registry.py`; no automatic promotion | `pytest tests/test_model_registry.py` |
 | FastAPI scoring | `/health`, `/model-info`, `/score`, `/docs` | `pytest tests/test_api.py` |
+| End-to-end latency target | warm-up and concurrent `/score` benchmark with p50/p95 reporting | `python -m fraud_scoring.benchmark --url http://127.0.0.1:8000/score --max-p95-ms 200` |
 | Docker build and non-root runtime | multi-stage `Dockerfile`, `.dockerignore`, `appuser` | `docker build --tag paysafe-fraud-scoring:local .` |
-| Scanning and SBOM awareness | documented in `docs/containers.md` | **PARTIAL:** run scanner/SBOM command in release environment |
+| Scanning and SBOM awareness | CI generates Trivy and SPDX-SBOM artifacts; local commands are documented in `docs/containers.md` | Review artifacts from a real GitHub Actions run |
 | CI | `.github/workflows/ci.yml` checks format, lint, type, test, data, Docker, secrets | GitHub Actions after push/PR |
-| Branch protection | manual GitHub settings in `docs/branch-protection.md` | **TODO:** maintainer must enable repository settings |
+| Branch protection and promotion authorization | documented GitHub ruleset and protected-environment/registry-credential guidance | **External verification required:** maintainer must confirm live GitHub and registry settings |
 | Final walkthrough | README, design, lineage, and this checklist | Follow README walkthrough sequence |
 
 No deployment, cloud registry push, automatic retraining, automatic promotion,
